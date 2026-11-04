@@ -120,9 +120,11 @@ button, input, select { font: inherit; color: inherit; }
 .stage { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; min-width: 0; }
 figure { margin: 0; }
 .plate-fig { display: flex; flex-direction: column; gap: 6px; }
-.plate-wrap { height: var(--stage-h); aspect-ratio: 240 / 474; max-width: 100%; position: relative; }
+.plate-wrap { height: var(--stage-h); aspect-ratio: 240 / 474; max-width: 100%; position: relative; align-self: flex-start; }
 .plate-wrap canvas, .detail-wrap canvas { display: block; width: 100%; height: 100%; touch-action: none; border-radius: 4px; }
 .probe {
+  /* the readout changes on every pointer move; it must never change the width of the canvas column */
+  contain: inline-size; width: 100%;
   font-family: var(--font-data); font-size: 12px; color: var(--ink-2); min-height: 1.5em;
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
@@ -1135,29 +1137,38 @@ function computeVel() {
     uc[c] = a; vc[c] = b; spd[c] = Math.hypot(a, b);
   }
 }
-function colorize() {
-  let vmax = 0, pmin = Infinity, pmax = -Infinity, wmax = 0, umax = 0;
-  const mode = state.view.mode;
-  for (let n = 0; n < fluidList.length; n++) {
-    const c = fluidList[n];
-    if (!portIn[c] && !portOut[c]) { if (spd[c] > vmax) vmax = spd[c]; if (Uloc[c] > umax) umax = Uloc[c]; }
-    if (p[c] < pmin) pmin = p[c]; if (p[c] > pmax) pmax = p[c];
+// colour scales follow robust percentiles of a cell sample, eased slowly, so single fast cells can't make the field pulse
+const SAMPLE = new Float32Array(4096);
+function percentile(get, q) {
+  let n = 0;
+  const stride = Math.max(1, Math.floor(fluidList.length / 4000));
+  for (let k = 0; k < fluidList.length && n < SAMPLE.length; k += stride) {
+    const c = fluidList[k]; if (portIn[c] || portOut[c]) continue; SAMPLE[n++] = get(c);
   }
+  if (!n) return 0;
+  const a = SAMPLE.subarray(0, n).sort();
+  return a[Math.min(n - 1, Math.floor(q * (n - 1)))];
+}
+function colorize() {
+  const mode = state.view.mode;
   if (mode === 'vort') {
     for (let n = 0; n < fluidList.length; n++) {
       const c = fluidList[n], f = flags[c];
       const vr = (f & 2) ? vc[c + 1] : vc[c], vl = (f & 1) ? vc[c - 1] : vc[c];
       const ud = (f & 8) ? uc[c + NX] : uc[c], uu = (f & 4) ? uc[c - NX] : uc[c];
       // y points down on screen; flip so anticlockwise swirl is positive
-      const w = -((vr - vl) / (2 * DX) - (ud - uu) / (2 * DX));
-      vortF[c] = w; const aw = Math.abs(w); if (aw > wmax && !portIn[c] && !portOut[c]) wmax = aw;
+      vortF[c] = -((vr - vl) / (2 * DX) - (ud - uu) / (2 * DX));
     }
   }
-  const sm = disp.init ? 0.12 : 1; disp.init = true;
-  disp.vmax += (Math.max(vmax, 1e-3) - disp.vmax) * sm;
-  disp.umax += (Math.max(umax, 1) - disp.umax) * sm;
-  if (isFinite(pmin)) { disp.pmin += (pmin - disp.pmin) * sm; disp.pmax += (Math.max(pmax, pmin + 1e-3) - disp.pmax) * sm; }
-  if (mode === 'vort') disp.wmax += (Math.max(wmax * 0.5, 1) - disp.wmax) * sm;
+  const first = !disp.init; disp.init = true;
+  const ease = (key, target, k) => { disp[key] = first ? target : disp[key] + (target - disp[key]) * k; };
+  ease('vmax', Math.max(percentile(c => spd[c], 0.98) * 1.08, 1e-3), 0.04);
+  if (mode === 'htc' || first) ease('umax', Math.max(percentile(c => Uloc[c], 0.98) * 1.05, 1), 0.04);
+  if (mode === 'pressure' || first) {
+    const lo = percentile(c => p[c], 0.005), hi = percentile(c => p[c], 0.995);
+    ease('pmin', lo, 0.04); ease('pmax', Math.max(hi, lo + 1e-3), 0.04);
+  }
+  if (mode === 'vort') ease('wmax', Math.max(percentile(c => Math.abs(vortF[c]), 0.95), 1), 0.04);
 
   const tau = tauNominal(), data = img.data, L = LUTS[mode].lut;
   const pr = disp.pmax - disp.pmin || 1, Tin = state.params.Tin, Tc = state.params.Tc;
@@ -1198,8 +1209,18 @@ function makeView(canvasId, wrapId, isPlate) {
 }
 function sizeView(view) {
   const r = view.wrap.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-  view.cssW = Math.max(50, r.width); view.cssH = Math.max(50, r.height); view.dpr = dpr;
-  view.canvas.width = Math.round(view.cssW * dpr); view.canvas.height = Math.round(view.cssH * dpr);
+  const cssW = Math.max(50, Math.round(r.width)), cssH = Math.max(50, Math.round(r.height));
+  const bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr);
+  // resizing a canvas wipes it, so only do it when the size really changed, and repaint straight away
+  if (bw === view.canvas.width && bh === view.canvas.height && dpr === view.dpr) return;
+  view.cssW = cssW; view.cssH = cssH; view.dpr = dpr;
+  view.canvas.width = bw; view.canvas.height = bh;
+  if (view.ready) repaint(view);
+}
+function repaint(view) {
+  fitView(view);
+  if (view === detail) { detail.region = detailRegion(); fitView(detail); }
+  drawView(view);
 }
 function fitView(view) {
   const Rg = view.region, s = Math.min(view.cssW / Rg.w, view.cssH / Rg.h);
@@ -1835,6 +1856,7 @@ function frame() {
   fitView(plate);
   detail.region = detailRegion(); fitView(detail);
   drawView(plate); drawView(detail);
+  plate.ready = detail.ready = true;
   if (frameNo % 10 === 0 || chartDirty) { updateMetrics(); chartDirty = false; }
   frameNo++;
   requestAnimationFrame(frame);
