@@ -1253,8 +1253,10 @@ function layer(view, name, key, paint) {
   if (!Ly) Ly = view.layers[name] = { c: document.createElement('canvas'), key: '' };
   const fullKey = `${key}|${view.canvas.width}x${view.canvas.height}|${view.s.toFixed(4)}|${view.ox.toFixed(2)}|${view.oy.toFixed(2)}|${VER.theme}`;
   if (Ly.key !== fullKey) {
-    Ly.c.width = view.canvas.width; Ly.c.height = view.canvas.height;
+    // reuse the bitmap: reallocating full-size canvases every frame stalls the browser
+    if (Ly.c.width !== view.canvas.width || Ly.c.height !== view.canvas.height) { Ly.c.width = view.canvas.width; Ly.c.height = view.canvas.height; }
     const x = Ly.c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, Ly.c.width, Ly.c.height);
     x.setTransform(view.dpr, 0, 0, view.dpr, 0, 0); x.translate(view.ox, view.oy); x.scale(view.s, view.s);
     paint(x, 1 / view.s); Ly.key = fullKey;
   }
@@ -1294,7 +1296,9 @@ function drawView(view) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = view.isPlate ? theme.bg : theme.panel;
   ctx.fillRect(0, 0, view.canvas.width, view.canvas.height);
-  layer(view, 'under', `u${VER.geom}`, paintUnder);
+  // while a shape is being dragged, the slow layers refresh a few times a second; the port rim and gasket stay live
+  const live = editingShape(), slowKey = live ? `d${Math.floor(frameNo / 8)}` : `g${VER.geom}.${VER.pattern}`;
+  layer(view, 'under', `u${slowKey}`, paintUnder);
 
   ctx.save();
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
@@ -1304,7 +1308,7 @@ function drawView(view) {
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(heat, 0, 0, W, H);
   ctx.restore();
-  if (state.zones.show) layer(view, 'pattern', `p${VER.geom}.${VER.pattern}`, (x) => { x.clip(G.gasketPath); drawPattern(x, view); });
+  if (state.zones.show) layer(view, 'pattern', `p${slowKey}`, (x) => { x.clip(G.gasketPath); drawPattern(x, view); });
 
   ctx.save();
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
@@ -1463,6 +1467,7 @@ function drawArrows(ctx, view) {
 
 /* ================= interaction ================= */
 let drag = null;
+const editingShape = () => !!drag && (drag.hit.type === 'pctrl' || drag.hit.type === 'pmove' || drag.hit.type === 'gasket');
 function hitTest(view, X, Y, touch) {
   const tol = touch ? 16 : 9;
   const near = q => { const [sx, sy] = toScreen(view, q[0], q[1]); return Math.hypot(sx - X, sy - Y); };
@@ -1841,7 +1846,7 @@ $('profile').addEventListener('pointermove', e => { chartHoverX = e.clientX; sho
 $('profile').addEventListener('pointerleave', () => { chartHoverX = null; $('tip').hidden = true; const g = $('profile').querySelector('#hov'); if (g) g.setAttribute('visibility', 'hidden'); });
 
 /* ================= main loop ================= */
-let geomDirty = true, extraIters = 0, frameNo = 0;
+let geomDirty = true, extraIters = 0, frameNo = 0, lastStreamFrame = 0;
 const plate = makeView('cvPlate', 'plateWrap', true);
 const detail = makeView('cvDetail', 'detailWrap', false);
 bindView(plate); bindView(detail);
@@ -1851,7 +1856,7 @@ function advance(frameDt) {
   for (let n = 0; n < fluidList.length; n += 3) { const c = fluidList[n]; if (spd[c] > umax) umax = spd[c]; }
   const nsub = clamp(Math.ceil(frameDt * umax / (3.5 * DX)), 1, 6), dt = frameDt / nsub;
   for (let k = 0; k < nsub; k++) {
-    const it = 32 + (extraIters > 0 ? 60 : 0); if (extraIters > 0) extraIters--;
+    const it = 32 + (extraIters > 0 ? (editingShape() ? 12 : 60) : 0); if (extraIters > 0) extraIters--;
     step(dt, it);
   }
   moveParticles(frameDt);
@@ -1860,7 +1865,8 @@ function frame() {
   if (geomDirty) { geomDirty = false; rebuildGeometry(); extraIters = Math.max(extraIters, 20); }
   if (state.running) advance(0.008);
   computeVel(); computeThermal(); colorize();
-  if (G.streamsDirty || (state.running && frameNo % 20 === 0)) { computeStreams(); G.streamsDirty = false; }
+  const streamDue = G.streamsDirty ? (!editingShape() || frameNo - lastStreamFrame >= 10) : (state.running && frameNo % 20 === 0);
+  if (streamDue) { computeStreams(); G.streamsDirty = false; lastStreamFrame = frameNo; }
   fitView(plate);
   detail.region = detailRegion(); fitView(detail);
   drawView(plate); drawView(detail);
