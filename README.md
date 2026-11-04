@@ -39,7 +39,7 @@ GitHub Pages for a **private** repository needs a paid GitHub plan (Pro, Team or
 - 2-D incompressible flow averaged across the channel gap, solved on a 2 mm grid. It uses a staggered (MAC) grid, semi-Lagrangian advection, implicit wall friction and a friction-weighted SOR pressure projection.
 - **Flat areas** use Hele-Shaw friction `12 μ / h²`, where `h` is the channel gap (0.5–5 mm).
 - **Chevron areas** use Martin's friction factor and Nusselt correlation (VDI Heat Atlas), evaluated from the local Reynolds number and the angle between the local flow and the ribs on each of the two walls.
-- **Distribution areas** are modelled as channels along fan lines from the port, with 2× flat resistance along them and 8× across. These factors are assumptions, not a published correlation.
+- **Distribution areas** form a band that follows the gasket line, so they keep a useful depth under the diagonal gasket on the far side. They are modelled as ribbed channels along fan lines from the port, at ±30° to those lines, using the same Martin correlations. This guides the water outward from the port with a resistance comparable to the chevron field, as in real "chocolate" distribution patterns. The ±30° channel angle is an assumption, not a published value.
 - **Heat transfer:** the cold side is held at a constant temperature with the same film coefficient as the hot side. `1/U = 2/h + t/k_steel`, so plate thickness enters through wall conduction (AISI 316, k = 16 W/m·K).
 - **Port flow:** `Q = v_port · A_port / N_channels`, spread evenly over the inlet port area and removed over the outlet port area.
 

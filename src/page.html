@@ -443,7 +443,7 @@ figure { margin: 0; }
         <button type="button" class="btn" id="btnRef">Pin as reference</button>
       </div>
       <p class="hint">Pin a design as a reference, change something, and every readout and the A–A profile show the comparison.</p>
-      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution area is modelled as channels along fan lines from the port: 2× flat resistance along them, 8× across (assumed). The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
+      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution area is a band that follows the gasket. It is modelled as ribbed channels running along fan lines from the port, at ±30° to those lines (assumed), using the same correlations. The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
     </section>
   </aside>
 </main>
@@ -682,12 +682,41 @@ const G = {
   areaIn: 0, areaOut: 0, fluidArea: 0, clearance: { in: 0, out: 0 }, streams: [], Q: 0, vPortEff: 0, Sin: 0, Sout: 0,
   F: waterAt(37.5), pattern: null, streamsDirty: true
 };
-const DIST_KPAR = 2, DIST_KPERP = 8;     // distribution-area resistance relative to a flat channel (assumed)
-
-function zoneAtY(y) {
-  const z = state.zones, top = y < z.distLen, bot = y > H - z.distLen;
+// The distribution pattern is modelled as low-angle channels running along fan lines from the port:
+// like a chevron whose ribs sit ±PHI_D either side of the fan direction (assumed, not a published correlation).
+const PHI_D = 30;
+// Distribution band boundaries per grid column (mm). The band follows the gasket, so it keeps a useful depth
+// under the diagonal gasket on the far side instead of tapering to a thin wedge.
+const yTopB = new Float32Array(NX), yBotB = new Float32Array(NX);
+function computeZoneBounds() {
+  const z = state.zones, band = Math.max(24, 0.33 * z.distLen);
+  const rawT = new Float32Array(NX), rawB = new Float32Array(NX), has = new Uint8Array(NX);
+  for (let i = 0; i < NX; i++) {
+    let jt = -1, jb = -1;
+    for (let j = 0; j < NY; j++) if (fluid[i + NX * j]) { jt = j; break; }
+    for (let j = NY - 1; j >= 0; j--) if (fluid[i + NX * j]) { jb = j; break; }
+    has[i] = jt >= 0 ? 1 : 0;
+    rawT[i] = jt < 0 ? z.distLen : Math.max(z.distLen, jt * CELL + band);
+    rawB[i] = jb < 0 ? H - z.distLen : Math.min(H - z.distLen, (jb + 1) * CELL - band);
+  }
+  for (let i = 0; i < NX; i++) {
+    let st = 0, sb = 0, n = 0;
+    for (let k = Math.max(0, i - 5); k <= Math.min(NX - 1, i + 5); k++) if (has[k]) { st += rawT[k]; sb += rawB[k]; n++; }
+    let t = n ? st / n : rawT[i], b = n ? sb / n : rawB[i];
+    if (t > b) t = b = (t + b) / 2;
+    yTopB[i] = t; yBotB[i] = b;
+  }
+}
+function zoneAt(i, y) {
+  i = i < 0 ? 0 : i > NX - 1 ? NX - 1 : i;
+  const z = state.zones, top = y < yTopB[i], bot = y > yBotB[i];
   if (top || bot) return z.dist ? (top ? 1 : 3) : (z.chev ? 2 : 0);
   return z.chev ? 2 : 0;
+}
+// angle between the local flow and the fan line, folded to 0–90°
+function fanAngle(a, b, dx, dy) {
+  const s = Math.hypot(a, b); if (s < 1e-9) return 0;
+  const c = Math.abs(a * dx + b * dy) / s; return Math.acos(c > 1 ? 1 : c) * DEG;
 }
 function setFaceDir(arr, idx, x, y, zone) {
   const pt = zone === 1 ? state.ports.in : state.ports.out;
@@ -696,13 +725,14 @@ function setFaceDir(arr, idx, x, y, zone) {
   arr[2 * idx] = dx; arr[2 * idx + 1] = dy;
 }
 function rebuildZones() {
-  for (let c = 0; c < NC; c++) zoneC[c] = fluid[c] && !portIn[c] && !portOut[c] ? zoneAtY(((c / NX | 0) + 0.5) * CELL) : 0;
+  computeZoneBounds();
+  for (let c = 0; c < NC; c++) zoneC[c] = fluid[c] && !portIn[c] && !portOut[c] ? zoneAt(c % NX, ((c / NX | 0) + 0.5) * CELL) : 0;
   for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
     const iu = i + R * j; zoneU[iu] = 0;
     if (!uOpen[iu]) continue;
     const cl = i - 1 + NX * j, cr = cl + 1;
     if (portIn[cl] || portIn[cr] || portOut[cl] || portOut[cr]) continue;
-    const z = zoneAtY((j + 0.5) * CELL); zoneU[iu] = z;
+    const z = zoneAt(i - 1, (j + 0.5) * CELL); zoneU[iu] = z;
     if (z === 1 || z === 3) setFaceDir(dirU, iu, i * CELL, (j + 0.5) * CELL, z);
   }
   for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
@@ -710,7 +740,7 @@ function rebuildZones() {
     if (!vOpen[iv]) continue;
     const ct = iv - NX, cb = iv;
     if (portIn[ct] || portIn[cb] || portOut[ct] || portOut[cb]) continue;
-    const z = zoneAtY(j * CELL); zoneV[iv] = z;
+    const z = zoneAt(i, j * CELL); zoneV[iv] = z;
     if (z === 1 || z === 3) setFaceDir(dirV, iv, (i + 0.5) * CELL, j * CELL, z);
   }
   buildPattern();
@@ -865,7 +895,7 @@ function step(dt, iters) {
   const P = state.params, F = G.F;
   const h = P.gap / 1000, Dh = 2 * h, inv = dt / DX;
   const kFlat = 12 * F.mu / (F.rho * h * h), kChev = F.mu / (2 * F.rho * Dh * Dh), reC = F.rho * Dh / F.mu, phi = state.zones.phi;
-  const fFlat = 1 / (1 + kFlat * dt), fPar = 1 / (1 + DIST_KPAR * kFlat * dt), fPerp = 1 / (1 + DIST_KPERP * kFlat * dt);
+  const fFlat = 1 / (1 + kFlat * dt);
 
   // 1. semi-Lagrangian advection (RK2 backtrace) into u1, v1
   for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
@@ -895,8 +925,10 @@ function step(dt, iters) {
       const k = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev, f = 1 / (1 + k * dt);
       u[iu] = a * f; bU[iu] = f;
     } else {
-      const dx = dirU[2 * iu], dy = dirU[2 * iu + 1], wd = a * dx + b * dy, wn = -a * dy + b * dx;
-      u[iu] = dx * wd * fPar - dy * wn * fPerp; bU[iu] = dx * dx * fPar + dy * dy * fPerp;
+      const Re = reC * Math.hypot(a, b);
+      const th = fanAngle(a, b, dirU[2 * iu], dirU[2 * iu + 1]), q = th + PHI_D;
+      const k = 0.5 * (lut(XR, Re, Math.abs(th - PHI_D)) + lut(XR, Re, q <= 90 ? q : 180 - q)) * kChev, f = 1 / (1 + k * dt);
+      u[iu] = a * f; bU[iu] = f;
     }
   }
   for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
@@ -910,8 +942,10 @@ function step(dt, iters) {
       const k = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev, f = 1 / (1 + k * dt);
       v[iv] = b * f; bV[iv] = f;
     } else {
-      const dx = dirV[2 * iv], dy = dirV[2 * iv + 1], wd = a * dx + b * dy, wn = -a * dy + b * dx;
-      v[iv] = dy * wd * fPar + dx * wn * fPerp; bV[iv] = dy * dy * fPar + dx * dx * fPerp;
+      const Re = reC * Math.hypot(a, b);
+      const th = fanAngle(a, b, dirV[2 * iv], dirV[2 * iv + 1]), q = th + PHI_D;
+      const k = 0.5 * (lut(XR, Re, Math.abs(th - PHI_D)) + lut(XR, Re, q <= 90 ? q : 180 - q)) * kChev, f = 1 / (1 + k * dt);
+      v[iv] = b * f; bV[iv] = f;
     }
   }
 
@@ -962,9 +996,15 @@ function computeThermal() {
   for (let n = 0; n < fluidList.length; n++) {
     const c = fluidList[n];
     let Nu = NU_FLAT;
-    if (zoneC[c] === 2) {
+    const zc = zoneC[c];
+    if (zc === 2) {
       const Re = reC * spd[c]; ribAngles(uc[c], vc[c], phi);
       Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, RA1) + lut(NUB, Re, RA2)));
+    } else if (zc === 1 || zc === 3) {
+      const pt = zc === 1 ? state.ports.in : state.ports.out, x = (c % NX + 0.5) * CELL, y = ((c / NX | 0) + 0.5) * CELL;
+      let dx = x - pt.cx, dy = y - pt.cy; const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+      const Re = reC * spd[c], th = fanAngle(uc[c], vc[c], dx, dy), q = th + PHI_D;
+      Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, Math.abs(th - PHI_D)) + lut(NUB, Re, q <= 90 ? q : 180 - q)));
     }
     const hc = Nu * F.k / Dh, U = 1 / (2 / hc + wall);
     Uloc[c] = (portIn[c] || portOut[c]) ? 0 : U;
@@ -1029,8 +1069,10 @@ function computeStreams() {
 /* ---------- pressing pattern (drawn in plate mm) ---------- */
 function buildPattern() {
   const z = state.zones, ribs = new Path2D(), lattice = new Path2D(), centre = new Path2D();
-  const chevTop = z.dist ? z.distLen : 0, chevBot = z.dist ? H - z.distLen : H;
+  let chevTop = 0, chevBot = H;
+  if (z.dist) { chevTop = Infinity; chevBot = -Infinity; for (let i = 0; i < NX; i++) { chevTop = Math.min(chevTop, yTopB[i]); chevBot = Math.max(chevBot, yBotB[i]); } }
   const regions = { chev: null, dist: null };
+  const xs = i => (i + 0.5) * CELL;
   if (z.chev && chevBot > chevTop) {
     const phi = z.phi / DEG, pitch = 6.5, sx = Math.sin(phi), cy = Math.cos(phi);
     const stepC = pitch / sx, Lr = (W / 2 + 4) / sx;
@@ -1038,12 +1080,27 @@ function buildPattern() {
       ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 - Lr * sx, c0 - Lr * cy);
       ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 + Lr * sx, c0 - Lr * cy);
     }
-    centre.moveTo(W / 2, chevTop); centre.lineTo(W / 2, chevBot);
-    regions.chev = new Path2D(); regions.chev.rect(-2, chevTop, W + 4, chevBot - chevTop);
+    const ic = NX / 2 | 0;
+    centre.moveTo(W / 2, z.dist ? yTopB[ic] : 0); centre.lineTo(W / 2, z.dist ? yBotB[ic] : H);
+    regions.chev = new Path2D();
+    if (!z.dist) regions.chev.rect(-2, -2, W + 4, H + 4);
+    else {
+      regions.chev.moveTo(-2, yTopB[0]); for (let i = 0; i < NX; i++) regions.chev.lineTo(xs(i), yTopB[i]);
+      regions.chev.lineTo(W + 2, yTopB[NX - 1]); regions.chev.lineTo(W + 2, yBotB[NX - 1]);
+      for (let i = NX - 1; i >= 0; i--) regions.chev.lineTo(xs(i), yBotB[i]);
+      regions.chev.lineTo(-2, yBotB[0]); regions.chev.closePath();
+    }
   }
   if (z.dist) {
-    regions.dist = new Path2D();
-    regions.dist.rect(-2, -2, W + 4, z.distLen + 2); regions.dist.rect(-2, H - z.distLen, W + 4, z.distLen + 2);
+    const rd = regions.dist = new Path2D();
+    rd.moveTo(-2, -2); rd.lineTo(W + 2, -2); rd.lineTo(W + 2, yTopB[NX - 1]);
+    for (let i = NX - 1; i >= 0; i--) rd.lineTo(xs(i), yTopB[i]);
+    rd.lineTo(-2, yTopB[0]); rd.closePath();
+    rd.moveTo(-2, H + 2); rd.lineTo(W + 2, H + 2); rd.lineTo(W + 2, yBotB[NX - 1]);
+    for (let i = NX - 1; i >= 0; i--) rd.lineTo(xs(i), yBotB[i]);
+    rd.lineTo(-2, yBotB[0]); rd.closePath();
+    // the boundary between the distribution band and the heat transfer area
+    for (const arr of [yTopB, yBotB]) { lattice.moveTo(0, arr[0]); for (let i = 0; i < NX; i++) lattice.lineTo(xs(i), arr[i]); lattice.lineTo(W, arr[NX - 1]); }
     for (const key of ['in', 'out']) {
       const pt = state.ports[key], sgn = key === 'in' ? 1 : -1;
       for (let a = -12; a <= 192; a += 10) {
@@ -1398,9 +1455,9 @@ function drawPlateAnnotations(ctx, view) {
     const z = state.zones, xs = toScreen(view, 24, 0)[0];
     if (z.dist) {
       pill(ctx, 'DISTRIBUTION', toScreen(view, 98, 0)[0], toScreen(view, 0, z.distLen - 8)[1]);
-      pill(ctx, 'DISTRIBUTION', xs, toScreen(view, 0, H - z.distLen + 8)[1]);
+      pill(ctx, 'DISTRIBUTION', toScreen(view, 98, 0)[0], toScreen(view, 0, H - z.distLen + 8)[1]);
     }
-    if (z.chev) pill(ctx, `CHEVRON ${z.phi}°`, xs, toScreen(view, 0, (z.dist ? z.distLen : 140) + 12)[1]);
+    if (z.chev) pill(ctx, `CHEVRON ${z.phi}°`, xs, toScreen(view, 0, (z.dist ? yTopB[12] : 140) + 12)[1]);
   }
   // chevron angle handle
   const A = phiGizmo();
@@ -1483,7 +1540,7 @@ const cursorFor = hit => !hit ? 'default' : hit.type === 'section' ? 'ns-resize'
 // on-plate chevron angle handle: apex on the centre line, handle along a rib
 function phiGizmo() {
   const z = state.zones; if (!z.chev || !z.show || state.editGasket) return null;
-  const top = z.dist ? z.distLen : 0, bot = z.dist ? H - z.distLen : H;
+  const ic = NX / 2 | 0, top = z.dist ? yTopB[ic] : 0, bot = z.dist ? yBotB[ic] : H;
   if (bot - top < 90) return null;
   const ax = W / 2, ay = top + 64, r = 44, ph = z.phi / DEG;
   return { ax, ay, r, hx: ax + r * Math.sin(ph), hy: ay - r * Math.cos(ph) };
