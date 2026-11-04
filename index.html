@@ -213,7 +213,8 @@ figure { margin: 0; }
   font-size: 13.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
-.seg button:not([aria-pressed="true"]):hover { background: var(--accent-soft); color: var(--ink); }
+.seg button:not([aria-pressed="true"]):not(:disabled):hover { background: var(--accent-soft); color: var(--ink); }
+.seg button:disabled { opacity: 0.45; cursor: default; }
 .presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .presets button {
   display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; cursor: pointer;
@@ -388,9 +389,14 @@ figure { margin: 0; }
         <input type="range" id="rDist" min="70" max="180" step="2" value="128"></label>
       <label class="check" for="chkChev"><input type="checkbox" id="chkChev" checked> Chevron ribs <small>stir the flow, raise heat transfer</small></label>
       <label class="sl" for="rPhi" id="slPhi"><span>Chevron angle to the flow</span><output id="oPhi">60° · hard</output>
-        <input type="range" id="rPhi" min="20" max="70" step="1" value="60"></label>
+        <input type="range" id="rPhi" min="10" max="80" step="1" value="60"></label>
+      <div class="seg" role="group" aria-label="Chevron angle presets" id="segPhi">
+        <button type="button" data-v="30" aria-pressed="false">Soft 30°</button>
+        <button type="button" data-v="45" aria-pressed="false">Mixed 45°</button>
+        <button type="button" data-v="60" aria-pressed="true">Hard 60°</button>
+      </div>
       <label class="check" for="chkPattern"><input type="checkbox" id="chkPattern" checked> Show the pressing pattern</label>
-      <p class="hint">Turn the distribution area off and the chevrons run right up to the port. Low chevron angles give gentle channels with a small pressure drop. High angles give strong turbulence, more heat transfer and a large pressure drop.</p>
+      <p class="hint">Turn the distribution area off and the chevrons run right up to the port. Low chevron angles give gentle channels with a small pressure drop. High angles give strong turbulence, more heat transfer and a large pressure drop. You can also drag the angle handle on the plate.</p>
     </section>
 
     <section class="ctl" aria-labelledby="hFlow">
@@ -515,6 +521,32 @@ function catmullRomClosed(pts, segFn) {
       const A1 = lerpT(p0, p1, t0, t1, t), A2 = lerpT(p1, p2, t1, t2, t), A3 = lerpT(p2, p3, t2, t3, t);
       const B1 = lerpT(A1, A2, t0, t2, t), B2 = lerpT(A2, A3, t1, t3, t);
       out.push(lerpT(B1, B2, t1, t2, t));
+    }
+  }
+  return out;
+}
+// gasket line: vertical spans are straight side seals; the rest are smooth Hermite curves that leave the sides tangentially
+const isSide = (a, b) => Math.abs(a[0] - b[0]) < 0.5;
+function gasketCurve(pts) {
+  const n = pts.length, out = [];
+  const unit = (x, y) => { const m = Math.hypot(x, y) || 1; return [x / m, y / m]; };
+  const straight = pts.map((a, i) => isSide(a, pts[(i + 1) % n]));
+  const tan = pts.map((p1, i) => {
+    const im = (i - 1 + n) % n, p0 = pts[im], p2 = pts[(i + 1) % n];
+    if (straight[im]) return unit(p1[0] - p0[0], p1[1] - p0[1]);
+    if (straight[i]) return unit(p2[0] - p1[0], p2[1] - p1[1]);
+    const a = unit(p1[0] - p0[0], p1[1] - p0[1]), b = unit(p2[0] - p1[0], p2[1] - p1[1]);
+    return unit(a[0] + b[0], a[1] + b[1]);
+  });
+  for (let i = 0; i < n; i++) {
+    const p1 = pts[i], p2 = pts[(i + 1) % n], L = dist(p1, p2);
+    out.push([p1[0], p1[1]]);
+    if (straight[i] || L < 1e-6) continue;
+    const m1 = tan[i], m2 = tan[(i + 1) % n], segs = clamp(Math.ceil(L / 2), 2, 60);
+    for (let s = 1; s < segs; s++) {
+      const t = s / segs, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push([h00 * p1[0] + h10 * L * m1[0] + h01 * p2[0] + h11 * L * m2[0], h00 * p1[1] + h10 * L * m1[1] + h01 * p2[1] + h11 * L * m2[1]]);
     }
   }
   return out;
@@ -691,7 +723,7 @@ function rebuildZones() {
 }
 
 function rebuildGeometry() {
-  G.gasketPoly = catmullRomClosed(state.gasket, (a, b) => clamp(Math.ceil(dist(a, b) / 2), 2, 60));
+  G.gasketPoly = gasketCurve(state.gasket);
   G.gasketPath = pathFrom(G.gasketPoly);
   G.inPoly = portPoly(state.ports.in);
   G.outPoly = portPoly(state.ports.out);
@@ -1353,6 +1385,22 @@ function drawPlateAnnotations(ctx, view) {
     }
     if (z.chev) pill(ctx, `CHEVRON ${z.phi}°`, xs, toScreen(view, 0, (z.dist ? z.distLen : 140) + 12)[1]);
   }
+  // chevron angle handle
+  const A = phiGizmo();
+  if (A) {
+    const [ax, ay] = toScreen(view, A.ax, A.ay), [hx, hy] = toScreen(view, A.hx, A.hy), r = A.r * view.s, ph = state.zones.phi / DEG;
+    ctx.save();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(ax, ay + 6); ctx.lineTo(ax, ay - r); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(ax, ay, r * 0.42, -Math.PI / 2, -Math.PI / 2 + ph); ctx.stroke();
+    const mid = -Math.PI / 2 + ph / 2, lx = ax + Math.cos(mid) * r * 0.42 + 6, ly = ay + Math.sin(mid) * r * 0.42 - 2;
+    ctx.font = `600 11px ${theme.displayFont}`; ctx.textBaseline = 'middle';
+    pill(ctx, `φ ${state.zones.phi}°`, lx, ly - 8);
+    drawHandle(ctx, hx, hy, plate.hoverHit && plate.hoverHit.type === 'phi' ? 6 : 5, false);
+    ctx.restore();
+  }
   // section labels
   const [ax, ay] = toScreen(view, -9, state.sectionY), [bx] = toScreen(view, W + 4, 0);
   ctx.font = `700 12px ${theme.displayFont}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1405,11 +1453,26 @@ function hitTest(view, X, Y, touch) {
   for (const key of order) { const pt = state.ports[key]; if (near([pt.cx, pt.cy]) < tol + 5) return { type: 'pmove', key }; }
   const [mx, my] = toMM(view, X, Y);
   for (const key of order) if (pointInPoly(mx, my, key === 'in' ? G.inPoly : G.outPoly)) return { type: 'pmove', key };
+  if (view.isPlate) {
+    const A = phiGizmo();
+    if (A && Math.hypot(...toScreen(view, A.hx, A.hy).map((q, i) => q - (i ? Y : X))) < tol + 2) return { type: 'phi' };
+  }
   const [, sy] = toScreen(view, 0, state.sectionY);
   if (Math.abs(sy - Y) < tol * 0.8 && mx > -16 && mx < W + 10) return { type: 'section' };
   return null;
 }
 const cursorFor = hit => !hit ? 'default' : hit.type === 'section' ? 'ns-resize' : hit.type === 'pmove' ? 'move' : 'grab';
+// on-plate chevron angle handle: apex on the centre line, handle along a rib
+function phiGizmo() {
+  const z = state.zones; if (!z.chev || !z.show || state.editGasket) return null;
+  const top = z.dist ? z.distLen : 0, bot = z.dist ? H - z.distLen : H;
+  if (bot - top < 90) return null;
+  const ax = W / 2, ay = top + 64, r = 44, ph = z.phi / DEG;
+  return { ax, ay, r, hx: ax + r * Math.sin(ph), hy: ay - r * Math.cos(ph) };
+}
+function setPhi(a) {
+  state.zones.phi = a; $('rPhi').value = a; $('oPhi').textContent = phiLabel(a); setSeg('segPhi', String(a)); buildPattern();
+}
 function bindView(view) {
   const cv = view.canvas;
   const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
@@ -1435,11 +1498,18 @@ function bindView(view) {
         const pt = state.ports[state.sel]; pt.base[hh.k] = mmToBase(pt, [clamp(m[0], -4, W + 4), clamp(m[1], -4, H + 4)]);
         if (pt.preset !== 'custom') { pt.preset = 'custom'; syncPortUI(); }
       } else if (hh.type === 'gasket') {
-        state.gasket[hh.k] = [clamp(m[0], 3, W - 3), clamp(m[1], 3, H - 3)];
+        const n = state.gasket.length, ga = state.gasket[(hh.k - 1 + n) % n], gb = state.gasket[(hh.k + 1) % n];
+        let gx = clamp(m[0], 3, W - 3);
+        // snap to a neighbour's x so the side seal stays straight
+        if (Math.abs(gx - ga[0]) < 2.5) gx = ga[0]; else if (Math.abs(gx - gb[0]) < 2.5) gx = gb[0];
+        state.gasket[hh.k] = [gx, clamp(m[1], 3, H - 3)];
       } else if (hh.type === 'section') {
         state.sectionY = clamp(m[1], 8, H - 8); chartDirty = true;
       }
-      if (hh.type !== 'section') geomDirty = true;
+      else if (hh.type === 'phi') {
+        const A = phiGizmo(); if (A) setPhi(clamp(Math.round(Math.atan2(Math.abs(m[0] - A.ax), Math.max(A.ay - m[1], 0.01)) * DEG), 10, 80));
+      }
+      if (hh.type !== 'section' && hh.type !== 'phi') geomDirty = true;
     } else {
       view.hoverHit = hitTest(view, X, Y, e.pointerType === 'touch');
       cv.style.cursor = cursorFor(view.hoverHit);
@@ -1522,11 +1592,13 @@ function syncPatternUI() {
   const z = state.zones;
   $('rDist').disabled = !z.dist; $('slDist').classList.toggle('off', !z.dist);
   $('rPhi').disabled = !z.chev; $('slPhi').classList.toggle('off', !z.chev);
+  $('segPhi').querySelectorAll('button').forEach(b => b.disabled = !z.chev);
 }
 $('chkDist').addEventListener('change', e => { state.zones.dist = e.target.checked; syncPatternUI(); geomDirty = true; });
 $('chkChev').addEventListener('change', e => { state.zones.chev = e.target.checked; syncPatternUI(); geomDirty = true; });
 $('rDist').addEventListener('input', e => { state.zones.distLen = +e.target.value; $('oDist').textContent = `${e.target.value} mm`; geomDirty = true; });
-$('rPhi').addEventListener('input', e => { state.zones.phi = +e.target.value; $('oPhi').textContent = phiLabel(+e.target.value); buildPattern(); });
+$('rPhi').addEventListener('input', e => setPhi(+e.target.value));
+bindSeg('segPhi', val => setPhi(+val));
 $('chkPattern').addEventListener('change', e => { state.zones.show = e.target.checked; });
 
 bindSeg('segHold', val => {

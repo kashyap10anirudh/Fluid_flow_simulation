@@ -4,12 +4,28 @@
 
 Open `index.html` in a browser. It is a single file with no build step and no dependencies.
 
+## Open it from GitHub (GitHub Pages)
+
+Once GitHub Pages is switched on, the simulation is live at:
+
+**https://kashyap10anirudh.github.io/Fluid_flow_simulation/**
+
+To switch it on (one time):
+
+1. On GitHub, open the repository and go to **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+3. Choose the branch that holds `index.html` (`main` once this work is merged, or `claude/plate-port-flow-lab` until then) and the folder **/ (root)**. Then click **Save**.
+4. Wait a minute or two. The address above appears at the top of the Pages settings when it's ready.
+
+GitHub Pages for a **private** repository needs a paid GitHub plan (Pro, Team or Enterprise). On a free plan, make the repository public first (**Settings → General → Danger Zone → Change visibility**). The empty `.nojekyll` file tells Pages to serve the files as they are.
+
 ## What it does
 
 - **The plate:** 200 × 440 mm and 0.5 mm thick. The hot-side inlet and outlet ports are on the right, the sealed cold-side ports with ring gaskets on the left, and a diagonal channel gasket runs around them.
 - **The flow:** water enters through the inlet port at a constant speed, or at a constant flow rate if you choose. It spreads into the channel, runs down the plate and leaves through the outlet port.
 - **Distribution areas** under each port fan the flow across the plate width before it reaches the heat transfer area. You can turn them on or off and set their length.
-- **Chevron (herringbone) ribs** in the heat transfer area resist sideways flow, stir the water and raise heat transfer. You can turn them on or off and set the chevron angle from 20° (soft) to 70° (hard).
+- **Chevron (herringbone) ribs** in the heat transfer area resist sideways flow, stir the water and raise heat transfer. You can turn them on or off and set the chevron angle from 10° to 80°. Use the slider, the soft (30°), mixed (45°) and hard (60°) presets, or drag the angle handle on the plate.
+- **The gasket** has straight side seals with rounded transitions into the diagonal sections. When you edit the gasket line, side points snap back into line so the sides stay straight.
 - **Port shapes** can be changed with presets (circle, square, slot, teardrop, D-shape, diamond), sliders (size, aspect, rotation) or by dragging 16 handles on the outline. You can also move the ports and edit the gasket line.
 - **Views:** colour the plate by speed, pressure, temperature, heat transfer coefficient, fluid age or swirl. Particles, streamlines and arrows can be shown on top.
 - **Readouts:**
