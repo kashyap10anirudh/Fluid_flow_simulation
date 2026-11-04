@@ -443,7 +443,7 @@ figure { margin: 0; }
         <button type="button" class="btn" id="btnRef">Pin as reference</button>
       </div>
       <p class="hint">Pin a design as a reference, change something, and every readout and the A–A profile show the comparison.</p>
-      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution area is a band that follows the gasket. It is modelled as ribbed channels running along fan lines from the port, at ±30° to those lines (assumed), using the same correlations. The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
+      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution areas carry an open "chocolate" stud pattern with low resistance that is the same in every direction, modelled with the same correlations at an effective 25° (assumed). In the ribbed area, particles travel in two layers that follow each plate's ribs and swap where the streams cross; their average is the computed flow. The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
     </section>
   </aside>
 </main>
@@ -670,7 +670,6 @@ const R = NX + 1, NU = R * NY, NV = NX * (NY + 1);
 const u = new Float32Array(NU), u1 = new Float32Array(NU), v = new Float32Array(NV), v1 = new Float32Array(NV);
 const bU = new Float32Array(NU), bV = new Float32Array(NV);
 const uOpen = new Uint8Array(NU), vOpen = new Uint8Array(NV), zoneU = new Uint8Array(NU), zoneV = new Uint8Array(NV);
-const dirU = new Float32Array(2 * NU), dirV = new Float32Array(2 * NV);
 const p = new Float32Array(NC), bRHS = new Float32Array(NC), S = new Float32Array(NC);
 let age = new Float32Array(NC), age1 = new Float32Array(NC), T = new Float32Array(NC), T1 = new Float32Array(NC);
 const uc = new Float32Array(NC), vc = new Float32Array(NC), spd = new Float32Array(NC), tCell = new Float32Array(NC);
@@ -682,14 +681,14 @@ const G = {
   areaIn: 0, areaOut: 0, fluidArea: 0, clearance: { in: 0, out: 0 }, streams: [], Q: 0, vPortEff: 0, Sin: 0, Sout: 0,
   F: waterAt(37.5), pattern: null, streamsDirty: true
 };
-// The distribution pattern is modelled as low-angle channels running along fan lines from the port:
-// like a chevron whose ribs sit ±PHI_D either side of the fan direction (assumed, not a published correlation).
-const PHI_D = 30;
-// Distribution band boundaries per grid column (mm). The band follows the gasket, so it keeps a useful depth
-// under the diagonal gasket on the far side instead of tapering to a thin wedge.
+// The distribution area carries an open "chocolate" stud pattern: few, large contact points, so its resistance is
+// low and the same in every direction (as described in plate patents). It is modelled with Martin's correlation at an
+// effective corrugation angle of 25° (assumed), applied whatever the flow direction.
+const DIST_PSI = 25;
+// Distribution area boundaries per grid column (mm): a triangle under the diagonal gasket, as on real plates.
 const yTopB = new Float32Array(NX), yBotB = new Float32Array(NX);
 function computeZoneBounds() {
-  const z = state.zones, band = Math.max(24, 0.33 * z.distLen);
+  const z = state.zones, band = 0;
   const rawT = new Float32Array(NX), rawB = new Float32Array(NX), has = new Uint8Array(NX);
   for (let i = 0; i < NX; i++) {
     let jt = -1, jb = -1;
@@ -713,17 +712,6 @@ function zoneAt(i, y) {
   if (top || bot) return z.dist ? (top ? 1 : 3) : (z.chev ? 2 : 0);
   return z.chev ? 2 : 0;
 }
-// angle between the local flow and the fan line, folded to 0–90°
-function fanAngle(a, b, dx, dy) {
-  const s = Math.hypot(a, b); if (s < 1e-9) return 0;
-  const c = Math.abs(a * dx + b * dy) / s; return Math.acos(c > 1 ? 1 : c) * DEG;
-}
-function setFaceDir(arr, idx, x, y, zone) {
-  const pt = zone === 1 ? state.ports.in : state.ports.out;
-  let dx = x - pt.cx, dy = y - pt.cy; const m = Math.hypot(dx, dy);
-  if (m < 1e-6) { dx = 0; dy = 1; } else { dx /= m; dy /= m; }
-  arr[2 * idx] = dx; arr[2 * idx + 1] = dy;
-}
 function rebuildZones() {
   computeZoneBounds();
   for (let c = 0; c < NC; c++) zoneC[c] = fluid[c] && !portIn[c] && !portOut[c] ? zoneAt(c % NX, ((c / NX | 0) + 0.5) * CELL) : 0;
@@ -733,7 +721,6 @@ function rebuildZones() {
     const cl = i - 1 + NX * j, cr = cl + 1;
     if (portIn[cl] || portIn[cr] || portOut[cl] || portOut[cr]) continue;
     const z = zoneAt(i - 1, (j + 0.5) * CELL); zoneU[iu] = z;
-    if (z === 1 || z === 3) setFaceDir(dirU, iu, i * CELL, (j + 0.5) * CELL, z);
   }
   for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
     const iv = i + NX * j; zoneV[iv] = 0;
@@ -741,7 +728,6 @@ function rebuildZones() {
     const ct = iv - NX, cb = iv;
     if (portIn[ct] || portIn[cb] || portOut[ct] || portOut[cb]) continue;
     const z = zoneAt(i, j * CELL); zoneV[iv] = z;
-    if (z === 1 || z === 3) setFaceDir(dirV, iv, (i + 0.5) * CELL, j * CELL, z);
   }
   buildPattern();
 }
@@ -926,8 +912,7 @@ function step(dt, iters) {
       u[iu] = a * f; bU[iu] = f;
     } else {
       const Re = reC * Math.hypot(a, b);
-      const th = fanAngle(a, b, dirU[2 * iu], dirU[2 * iu + 1]), q = th + PHI_D;
-      const k = 0.5 * (lut(XR, Re, Math.abs(th - PHI_D)) + lut(XR, Re, q <= 90 ? q : 180 - q)) * kChev, f = 1 / (1 + k * dt);
+      const k = lut(XR, Re, DIST_PSI) * kChev, f = 1 / (1 + k * dt);
       u[iu] = a * f; bU[iu] = f;
     }
   }
@@ -943,8 +928,7 @@ function step(dt, iters) {
       v[iv] = b * f; bV[iv] = f;
     } else {
       const Re = reC * Math.hypot(a, b);
-      const th = fanAngle(a, b, dirV[2 * iv], dirV[2 * iv + 1]), q = th + PHI_D;
-      const k = 0.5 * (lut(XR, Re, Math.abs(th - PHI_D)) + lut(XR, Re, q <= 90 ? q : 180 - q)) * kChev, f = 1 / (1 + k * dt);
+      const k = lut(XR, Re, DIST_PSI) * kChev, f = 1 / (1 + k * dt);
       v[iv] = b * f; bV[iv] = f;
     }
   }
@@ -1001,10 +985,7 @@ function computeThermal() {
       const Re = reC * spd[c]; ribAngles(uc[c], vc[c], phi);
       Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, RA1) + lut(NUB, Re, RA2)));
     } else if (zc === 1 || zc === 3) {
-      const pt = zc === 1 ? state.ports.in : state.ports.out, x = (c % NX + 0.5) * CELL, y = ((c / NX | 0) + 0.5) * CELL;
-      let dx = x - pt.cx, dy = y - pt.cy; const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
-      const Re = reC * spd[c], th = fanAngle(uc[c], vc[c], dx, dy), q = th + PHI_D;
-      Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, Math.abs(th - PHI_D)) + lut(NUB, Re, q <= 90 ? q : 180 - q)));
+      Nu = Math.max(NU_FLAT, prf * lut(NUB, reC * spd[c], DIST_PSI));
     }
     const hc = Nu * F.k / Dh, U = 1 / (2 / hc + wall);
     Uloc[c] = (portIn[c] || portOut[c]) ? 0 : U;
@@ -1015,24 +996,48 @@ function computeThermal() {
 /* ---------- particles ---------- */
 const NPART = 1500;
 const px = new Float32Array(NPART), py = new Float32Array(NPART), ppx = new Float32Array(NPART), ppy = new Float32Array(NPART), plife = new Float32Array(NPART);
+// In a cross-corrugated channel the water near each plate runs along that plate's furrows; the two streams cross and
+// swap where they meet. Each particle rides in one of the two layers. The layer speeds are chosen so that their average
+// is exactly the computed (depth-averaged) flow, so the particles show the criss-cross without changing the flow.
+const player = new Int8Array(NPART);
 function spawn(k, anywhere) {
   let c;
   if (!anywhere && inCells.length) c = inCells[(Math.random() * inCells.length) | 0];
   else c = fluidList.length ? fluidList[(Math.random() * fluidList.length) | 0] : 0;
   px[k] = ppx[k] = c % NX + Math.random(); py[k] = ppy[k] = ((c / NX) | 0) + Math.random();
   plife[k] = anywhere ? Math.random() * 2 : 0;
+  player[k] = Math.random() < 0.5 ? 1 : -1;
 }
 function resetParticles() { for (let k = 0; k < NPART; k++) spawn(k, true); }
 function tauNominal() { return G.Q > 0 ? (G.fluidArea * 1e-6 * state.params.gap / 1000) / G.Q : Infinity; }
 function moveParticles(dt) {
   const inv = dt / DX, pOut = 1 - Math.exp(-Math.abs(G.Sout) * dt), maxLife = Math.min(14, 6 * tauNominal());
+  const z = state.zones, ph = z.phi / DEG, sP = Math.sin(ph), cP = Math.cos(ph);
+  // furrow flow dominates at low angles; at high angles the streams increasingly cross over the furrows
+  const follow = clamp((85 - z.phi) / 40, 0.25, 1), lMix = (20 + 70 * cP * cP) / 1000;
+  const ok = (qx, qy) => qx >= 0 && qy >= 0 && (qx | 0) < NX && (qy | 0) < NY && fluid[(qx | 0) + NX * (qy | 0)];
   for (let k = 0; k < NPART; k++) {
     const x = px[k], y = py[k]; ppx[k] = x; ppy[k] = y;
     const a = sampleU(x, y), b = sampleV(x, y);
     const xm = x + 0.5 * inv * a, ym = y + 0.5 * inv * b;
-    const nx = x + inv * sampleU(xm, ym), ny = y + inv * sampleV(xm, ym);
-    const ci = nx | 0, cj = ny | 0;
-    if (nx >= 0 && ny >= 0 && ci < NX && cj < NY && fluid[ci + NX * cj]) { px[k] = nx; py[k] = ny; }
+    let mx = inv * sampleU(xm, ym), my = inv * sampleV(xm, ym), fx = 0, fy = 0;
+    const c0 = (x | 0) + NX * (y | 0);
+    if (z.chev && zoneC[c0] === 2) {
+      const U = Math.hypot(a, b);
+      if (U > 1e-4) {
+        const sg = x * CELL < W / 2 ? 1 : -1, L = player[k];
+        const s = b / cP + L * a / (sg * sP);
+        let vx = s * L * sg * sP, vy = s * cP;
+        const vm = Math.hypot(vx, vy); if (vm > 3 * U) { vx *= 3 * U / vm; vy *= 3 * U / vm; }
+        fx = follow * (vx - a) * inv; fy = follow * (vy - b) * inv;
+        if (Math.random() < 1 - Math.exp(-U * dt / lMix)) player[k] = -L;
+      }
+    }
+    let nx = x + mx + fx, ny = y + my + fy;
+    if (!ok(nx, ny)) { player[k] = -player[k]; nx = x + mx; ny = y + my; }   // a furrow stream turns at the gasket
+    // at the herringbone apex one plate's furrows meet head-on, so the water hands over to the facing plate's furrows
+    else if (fx !== 0 && (x * CELL < W / 2) !== (nx * CELL < W / 2)) player[k] = -player[k];
+    if (ok(nx, ny)) { px[k] = nx; py[k] = ny; }
     plife[k] += dt;
     const c = (px[k] | 0) + NX * (py[k] | 0);
     if (!fluid[c] || plife[k] > maxLife || (portOut[c] && Math.random() < pOut)) spawn(k, false);
@@ -1737,7 +1742,7 @@ function updateLegend(force) {
   const mode = state.view.mode, L = LUTS[mode]; if (!L) return;
   const tau = tauNominal(), P = state.params;
   let title, unit, a, b, c;
-  if (mode === 'speed') { title = 'In-plane speed'; unit = 'm/s'; a = '0'; b = (disp.vmax / 2).toFixed(2); c = disp.vmax.toFixed(2); }
+  if (mode === 'speed') { title = 'In-plane speed'; unit = Number.isFinite(lastVals.mean) ? `m/s · plate mean ${lastVals.mean.toFixed(2)}` : 'm/s'; a = '0'; b = (disp.vmax / 2).toFixed(2); c = disp.vmax.toFixed(2); }
   else if (mode === 'pressure') {
     const pref = outletPressure();
     const sc = Math.max(Math.abs(disp.pmax - pref), Math.abs(disp.pmin - pref)) >= 1000 ? 1000 : 1;
