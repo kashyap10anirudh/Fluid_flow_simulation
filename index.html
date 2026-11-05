@@ -1,0 +1,2156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Plate Port Flow Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an engineering bench. The tall plate drawing sits at left, the port detail and readouts beside it, and the control rail at right. */
+:root {
+  --bg: #e9edf0;
+  --panel: #f7f9fa;
+  --ink: #15212a;
+  --ink-2: #485763;
+  --ink-3: #6f7d88;
+  --line: #d0d8de;
+  --accent: #0d6772;
+  --accent-ink: #ffffff;
+  --accent-soft: #d5eaec;
+  --steel-a: #cfd6db;
+  --steel-b: #b2bcc4;
+  --steel-edge: #7c8993;
+  --gasket: #1f2428;
+  --gasket-hi: #4a545b;
+  --hole: rgba(21, 33, 42, 0.30);
+  --handle: #ffffff;
+  --trace: rgba(12, 28, 42, 0.42);
+  --rib: rgba(16, 30, 42, 0.30);
+  --rib-hi: rgba(255, 255, 255, 0.45);
+  --contact: rgba(16, 30, 42, 0.62);
+  --series: #2a78d6;
+  --series-fill: rgba(42, 120, 214, 0.14);
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --stage-h: clamp(560px, calc(100vh - 132px), 980px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101519;
+    --panel: #172027;
+    --ink: #e6ecf0;
+    --ink-2: #a8b5be;
+    --ink-3: #7d8b95;
+    --line: #2a353e;
+    --accent: #52b6c2;
+    --accent-ink: #06262a;
+    --accent-soft: #173a40;
+    --steel-a: #3a454d;
+    --steel-b: #2a333a;
+    --steel-edge: #5b6973;
+    --gasket: #050708;
+    --gasket-hi: #2a3238;
+    --hole: rgba(0, 0, 0, 0.38);
+    --handle: #172027;
+    --trace: rgba(236, 244, 250, 0.45);
+    --rib: rgba(0, 0, 0, 0.42);
+    --rib-hi: rgba(255, 255, 255, 0.16);
+    --contact: rgba(225, 235, 242, 0.55);
+    --series: #3987e5;
+    --series-fill: rgba(57, 135, 229, 0.18);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101519;
+  --panel: #172027;
+  --ink: #e6ecf0;
+  --ink-2: #a8b5be;
+  --ink-3: #7d8b95;
+  --line: #2a353e;
+  --accent: #52b6c2;
+  --accent-ink: #06262a;
+  --accent-soft: #173a40;
+  --steel-a: #3a454d;
+  --steel-b: #2a333a;
+  --steel-edge: #5b6973;
+  --gasket: #050708;
+  --gasket-hi: #2a3238;
+  --hole: rgba(0, 0, 0, 0.38);
+  --handle: #172027;
+  --trace: rgba(236, 244, 250, 0.45);
+  --rib: rgba(0, 0, 0, 0.42);
+  --rib-hi: rgba(255, 255, 255, 0.16);
+  --contact: rgba(225, 235, 242, 0.55);
+  --series: #3987e5;
+  --series-fill: rgba(57, 135, 229, 0.18);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 28px;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+.top {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 8px 24px; padding-block: 16px 12px; border-bottom: 1px solid var(--line);
+}
+.top h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.65rem;
+  letter-spacing: 0.01em; line-height: 1.1; text-wrap: balance;
+}
+.top .sub { margin: 2px 0 0; color: var(--ink-2); max-width: 66ch; }
+.spec { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--font-data); font-size: 12px; }
+.spec span { padding: 3px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink-2); background: var(--panel); }
+.spec b { color: var(--ink); font-weight: 500; }
+
+/* ---------- bench grid ---------- */
+.bench {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; padding-block: 16px 0;
+}
+.stage { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; min-width: 0; }
+figure { margin: 0; }
+.plate-fig { display: flex; flex-direction: column; gap: 6px; }
+.plate-wrap { height: var(--stage-h); aspect-ratio: 240 / 474; max-width: 100%; position: relative; align-self: flex-start; }
+.plate-wrap canvas, .detail-wrap canvas { display: block; width: 100%; height: 100%; touch-action: none; border-radius: 4px; }
+.probe {
+  /* the readout changes on every pointer move; it must never change the width of the canvas column */
+  contain: inline-size; width: 100%;
+  font-family: var(--font-data); font-size: 12px; color: var(--ink-2); min-height: 1.5em;
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 460px; }
+.fig-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-bottom: 6px;
+  font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink);
+}
+.fig-head .eyebrow, .ctl h2, .legend-head span:first-child, .metrics dt, .group-label {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+}
+.fig-head .eyebrow { font-size: 0.78rem; color: var(--accent); }
+.fig-head .meta { font-family: var(--font-data); font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.detail-wrap { aspect-ratio: 1 / 1; width: 100%; position: relative; }
+
+.legend-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; color: var(--ink-2); margin-bottom: 4px; }
+.legend-head span:last-child { font-family: var(--font-data); font-size: 12px; white-space: nowrap; }
+.legend-bar { height: 10px; border-radius: 2px; border: 1px solid var(--line); }
+.legend-ticks { display: flex; justify-content: space-between; font-family: var(--font-data); font-size: 11.5px; color: var(--ink-3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+.alerts { display: flex; flex-direction: column; gap: 6px; }
+.alerts:empty { display: none; }
+.alert {
+  display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.35;
+  padding: 7px 10px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line);
+}
+.alert svg { flex: none; margin-top: 1px; }
+
+.group-label { font-size: 0.72rem; color: var(--accent); margin: 2px 0 0; }
+.metrics {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0;
+  border-top: 1px solid var(--line);
+}
+.metrics > div { padding: 7px 0 6px; border-bottom: 1px solid var(--line); min-width: 0; }
+.metrics > div:nth-child(odd) { padding-right: 12px; }
+.metrics > div:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--line); }
+.metrics dt { font-size: 0.72rem; color: var(--ink-3); }
+.metrics dd { margin: 1px 0 0; font-family: var(--font-data); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metrics dd small { font-size: 11.5px; color: var(--ink-3); margin-left: 3px; }
+.metrics dd .ref { display: block; font-size: 11px; color: var(--ink-3); margin: 0; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-data); font-size: 11.5px; font-weight: 500;
+  padding: 2px 7px 2px 5px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+.chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.profile-pick { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.profile-pick select {
+  font: 600 0.95rem var(--font-display); color: var(--ink); background: var(--bg); min-width: 0; max-width: 100%;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; cursor: pointer; accent-color: var(--accent);
+}
+.profile-pick select:hover { border-color: var(--accent); }
+.chart-legend { display: flex; gap: 14px; font-family: var(--font-data); font-size: 11.5px; color: var(--ink-2); margin: -2px 0 4px; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend svg { width: 18px; height: 6px; }
+
+.chart-box { position: relative; }
+#profile { display: block; width: 100%; height: 170px; overflow: visible; }
+#profile .grid { stroke: var(--line); stroke-width: 1; }
+#profile .axis-text { fill: var(--ink-3); font: 11px var(--font-data); }
+#profile .line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+#profile .refline { fill: none; stroke: var(--ink-3); stroke-width: 1.6; stroke-dasharray: 5 3; }
+#profile .area { fill: var(--series-fill); stroke: none; }
+#profile .mean { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
+#profile .mean-text { fill: var(--ink-2); font: 11px var(--font-data); }
+#profile .cross { stroke: var(--ink-3); stroke-width: 1; }
+#profile .dot { fill: var(--series); stroke: var(--panel); stroke-width: 2; }
+#profile .zero { stroke: var(--ink-3); stroke-width: 1; }
+.tip {
+  position: absolute; pointer-events: none; transform: translate(-50%, -100%);
+  background: var(--ink); color: var(--bg); font: 11.5px/1.3 var(--font-data); padding: 4px 7px; border-radius: 3px; white-space: nowrap;
+}
+
+/* ---------- control rail ---------- */
+.rail {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  display: flex; flex-direction: column; min-width: 0;
+}
+.ctl { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 11px; border-top: 1px solid var(--line); min-width: 0; }
+.ctl:first-child { border-top: 0; }
+.ctl h2 { margin: 0; font-size: 0.8rem; color: var(--ink-2); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 4px; padding: 2px; gap: 2px; background: var(--bg); }
+.seg.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.seg.modes { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.seg.modes button { grid-column: span 3; }
+.seg.modes button.wide { grid-column: span 4; }
+.seg button {
+  flex: 1 1 0; min-width: 0; border: 0; background: transparent; padding: 6px 6px; border-radius: 3px; cursor: pointer;
+  font-size: 13.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:not([aria-pressed="true"]):not(:disabled):hover { background: var(--accent-soft); color: var(--ink); }
+.seg button:disabled { opacity: 0.45; cursor: default; }
+.presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.presets button {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-size: 12.5px; color: var(--ink-2);
+}
+.presets button svg { width: 26px; height: 26px; }
+.presets button svg path { fill: var(--steel-b); stroke: var(--ink); stroke-width: 1.4; }
+.presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
+.presets button[aria-pressed="true"] svg path { fill: var(--accent-soft); stroke: var(--accent); }
+.presets button:hover { color: var(--ink); }
+.custom-note { font-size: 12.5px; color: var(--accent); margin-top: -4px; }
+.custom-note:empty { display: none; }
+
+.sl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: baseline; font-size: 13.5px; }
+.sl output { font-family: var(--font-data); font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sl input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
+.sl input:disabled { opacity: 0.45; }
+.sl.off { color: var(--ink-3); }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.field input, .field select {
+  width: 104px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+  font-family: var(--font-data); font-size: 13px;
+}
+.mini { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0; font-size: 13px; }
+.mini dt { color: var(--ink-2); }
+.mini dd { margin: 0; font-family: var(--font-data); font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--bg); padding: 6px 12px; border-radius: 4px; cursor: pointer;
+  font-size: 13.5px; font-weight: 500;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
+.check small { color: var(--ink-3); font-size: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.hint { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.xsec { width: 100%; height: auto; display: block; }
+.xsec .pl { fill: none; stroke: var(--steel-edge); stroke-linejoin: round; }
+.xsec .gk { fill: var(--gasket); }
+.xsec .fl { fill: var(--series-fill); }
+.xsec text { fill: var(--ink-2); font: 10.5px var(--font-data); }
+.xsec .dim { stroke: var(--ink-3); stroke-width: 0.8; fill: none; }
+.xsec .arrow { stroke: var(--series); stroke-width: 1.4; fill: none; }
+
+@media (max-width: 1180px) {
+  .bench { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ctl:nth-child(2) { border-top: 0; }
+  .ctl:nth-child(even) { border-left: 1px solid var(--line); }
+}
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .plate-wrap { height: auto; width: 100%; }
+  .side { max-width: none; }
+  .detail-wrap { max-width: 420px; }
+  .rail { display: flex; }
+  .ctl:nth-child(2) { border-top: 1px solid var(--line); }
+  .ctl:nth-child(even) { border-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+
+<header class="top">
+  <div>
+    <h1>Plate Port Flow Lab</h1>
+    <p class="sub">A gasketed heat-exchanger plate. Hot water enters through the inlet port at a set speed. A distribution area fans it across the width, and chevron ribs in the heat transfer area stir it as it runs down to the outlet. Reshape the ports or the pattern and watch the flow and heat transfer respond.</p>
+  </div>
+  <div class="spec" aria-label="Plate specification">
+    <span>Plate <b>200 × 440</b> mm</span>
+    <span>t = <b id="specT">0.50</b> mm</span>
+    <span>Gap <b id="specGap">2.0</b> mm</span>
+    <span>Hot <b id="specTin">60</b> °C · Cold <b id="specTc">15</b> °C</span>
+  </div>
+</header>
+
+<main class="bench">
+  <section class="stage" aria-label="Flow simulation">
+    <figure class="plate-fig">
+      <div class="plate-wrap" id="plateWrap">
+        <canvas id="cvPlate" tabindex="0" aria-label="Plate view. Drag a port to move it, drag its handles to reshape it, and drag the A–A line to move the measuring section. Arrow keys nudge the selected port."></canvas>
+      </div>
+      <figcaption class="probe" id="probe">Hover over the plate to probe the flow</figcaption>
+    </figure>
+
+    <div class="side">
+      <figure>
+        <div class="fig-head"><span class="eyebrow">Port detail</span><span class="meta" id="detailLabel">Inlet port</span></div>
+        <div class="detail-wrap" id="detailWrap">
+          <canvas id="cvDetail" tabindex="0" aria-label="Zoomed view of the selected port. Drag handles to reshape the port precisely."></canvas>
+        </div>
+      </figure>
+
+      <div>
+        <div class="legend-head"><span id="legendTitle">In-plane speed</span><span id="legendUnit">m/s</span></div>
+        <div class="legend-bar" id="legendBar"></div>
+        <div class="legend-ticks"><span id="lg0">0</span><span id="lg1"></span><span id="lg2"></span></div>
+      </div>
+
+      <div class="alerts" id="alerts" aria-live="polite"></div>
+
+      <div>
+        <p class="group-label">Hydraulics</p>
+        <dl class="metrics">
+          <div><dt>Channel flow</dt><dd id="mQ">–</dd></div>
+          <div><dt>Port velocity</dt><dd id="mV">–</dd></div>
+          <div><dt>Pressure drop</dt><dd id="mDp">–</dd></div>
+          <div><dt>Reynolds (gap)</dt><dd id="mRe">–</dd></div>
+          <div><dt>Mean speed</dt><dd id="mU">–</dd></div>
+          <div><dt>Low-flow area</dt><dd id="mDead">–</dd></div>
+        </dl>
+      </div>
+      <div>
+        <p class="group-label">Heat transfer</p>
+        <dl class="metrics">
+          <div><dt>Outlet temperature</dt><dd id="mTout">–</dd></div>
+          <div><dt>Heat duty</dt><dd id="mDuty">–</dd></div>
+          <div><dt>Mean U, plate</dt><dd id="mUht">–</dd></div>
+          <div><dt>Effectiveness</dt><dd id="mEff">–</dd></div>
+        </dl>
+      </div>
+
+      <figure>
+        <div class="fig-head">
+          <label class="profile-pick" for="selProfile"><span>Section A–A</span>
+            <select id="selProfile">
+              <option value="vdown" selected>Downward velocity</option>
+              <option value="speed">Speed</option>
+              <option value="vside">Sideways velocity</option>
+              <option value="pressure">Pressure</option>
+              <option value="temp">Temperature</option>
+              <option value="htc">Heat transfer coefficient U</option>
+              <option value="age">Fluid age</option>
+              <option value="vort">Swirl</option>
+              <option value="turb">Turbulence intensity</option>
+            </select></label>
+          <span class="chip" id="uniChip" title="Flow uniformity of the downward velocity across A–A"><i></i><span>–</span></span>
+        </div>
+        <div class="chart-legend" id="chartLegend" hidden>
+          <span><svg viewBox="0 0 18 6" aria-hidden="true"><line x1="0" y1="3" x2="18" y2="3" stroke="var(--series)" stroke-width="2"/></svg>Current</span>
+          <span><svg viewBox="0 0 18 6" aria-hidden="true"><line x1="0" y1="3" x2="18" y2="3" stroke="var(--ink-3)" stroke-width="1.6" stroke-dasharray="5 3"/></svg>Reference</span>
+        </div>
+        <div class="chart-box" id="chartBox">
+          <svg id="profile" role="img" aria-label="Line chart of the downward velocity across the plate width at section A–A"></svg>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <aside class="rail" aria-label="Controls">
+    <section class="ctl" aria-labelledby="hPort">
+      <h2 id="hPort">Port shape</h2>
+      <div class="seg" role="group" aria-label="Port to edit" id="segPort">
+        <button type="button" data-v="in" aria-pressed="true">Inlet port</button>
+        <button type="button" data-v="out" aria-pressed="false">Outlet port</button>
+      </div>
+      <div class="presets" id="presets" role="group" aria-label="Port shape presets"></div>
+      <div class="custom-note" id="customNote"></div>
+      <label class="sl" for="rSize"><span>Nominal diameter</span><output id="oSize">35 mm</output>
+        <input type="range" id="rSize" min="20" max="80" step="1" value="35"></label>
+      <label class="sl" for="rAspect"><span>Aspect (width : height)</span><output id="oAspect">1.00</output>
+        <input type="range" id="rAspect" min="0.5" max="2" step="0.05" value="1"></label>
+      <label class="sl" for="rRot"><span>Rotation</span><output id="oRot">0°</output>
+        <input type="range" id="rRot" min="-90" max="90" step="1" value="0"></label>
+      <dl class="mini">
+        <dt>Equivalent Ø</dt><dd id="psD">–</dd>
+        <dt>Open area</dt><dd id="psA">–</dd>
+        <dt>Rim perimeter</dt><dd id="psP">–</dd>
+        <dt>Clearance to gasket</dt><dd id="psC">–</dd>
+      </dl>
+      <div class="row">
+        <button type="button" class="btn" id="btnResetPort">Reset port</button>
+        <button type="button" class="btn" id="btnCopyPort">Copy to outlet port</button>
+      </div>
+      <p class="hint">Drag the round handles on the selected port to reshape it. Drag the port centre to move it. Arrow keys nudge it 1 mm (Shift: 5 mm). The sealed cold-side ports on the left copy the shape of the port beside them.</p>
+    </section>
+
+    <section class="ctl" aria-labelledby="hPattern">
+      <h2 id="hPattern">Plate pattern</h2>
+      <label class="check" for="chkDist"><input type="checkbox" id="chkDist" checked> Distribution area <small>fans the flow across the width</small></label>
+      <label class="sl" for="rDist" id="slDist"><span>Distribution area length</span><output id="oDist">128 mm</output>
+        <input type="range" id="rDist" min="70" max="180" step="2" value="128"></label>
+      <label class="check" for="chkChev"><input type="checkbox" id="chkChev" checked> Chevron ribs <small>stir the flow, raise heat transfer</small></label>
+      <label class="sl" for="rPhi" id="slPhi"><span>Chevron angle to the flow</span><output id="oPhi">60° · hard</output>
+        <input type="range" id="rPhi" min="10" max="80" step="1" value="60"></label>
+      <div class="seg" role="group" aria-label="Chevron angle presets" id="segPhi">
+        <button type="button" data-v="30" aria-pressed="false">Soft 30°</button>
+        <button type="button" data-v="45" aria-pressed="false">Mixed 45°</button>
+        <button type="button" data-v="60" aria-pressed="true">Hard 60°</button>
+      </div>
+      <label class="check" for="chkPattern"><input type="checkbox" id="chkPattern" checked> Show the pressing pattern</label>
+      <p class="hint">Turn the distribution area off and the chevrons run right up to the port. Low chevron angles give gentle channels with a small pressure drop. High angles give strong turbulence, more heat transfer and a large pressure drop. You can also drag the angle handle on the plate.</p>
+    </section>
+
+    <section class="ctl" aria-labelledby="hFlow">
+      <h2 id="hFlow">Flow &amp; heat</h2>
+      <div class="seg" role="group" aria-label="Quantity held constant" id="segHold">
+        <button type="button" data-v="speed" aria-pressed="true">Hold port speed</button>
+        <button type="button" data-v="flow" aria-pressed="false">Hold flow rate</button>
+      </div>
+      <label class="sl" for="rV" id="slV"><span>Port velocity</span><output id="oV">2.10 m/s</output>
+        <input type="range" id="rV" min="0.2" max="3" step="0.05" value="2.1"></label>
+      <label class="sl" for="rQ" id="slQ" hidden><span>Flow into this channel</span><output id="oQ">6.1 L/min</output>
+        <input type="range" id="rQ" min="0.2" max="20" step="0.1" value="6.1"></label>
+      <label class="sl" for="rN"><span>Channels fed by the port</span><output id="oN">20</output>
+        <input type="range" id="rN" min="4" max="150" step="1" value="20"></label>
+      <p class="hint">In a plate pack every second gap carries the hot water, and the port feeds all of those channels at once. This page simulates one of them, so it gets the port flow divided by this number.</p>
+      <label class="sl" for="rGap"><span>Channel gap (pressing depth)</span><output id="oGap">2.0 mm</output>
+        <input type="range" id="rGap" min="0.5" max="5" step="0.1" value="2"></label>
+      <label class="sl" for="rTin"><span>Hot water inlet</span><output id="oTin">60 °C</output>
+        <input type="range" id="rTin" min="20" max="80" step="1" value="60"></label>
+      <label class="sl" for="rTc"><span>Cold side</span><output id="oTc">15 °C</output>
+        <input type="range" id="rTc" min="5" max="60" step="1" value="15"></label>
+      <label class="field" for="nT"><span>Plate thickness, mm (AISI 316)</span><input type="number" id="nT" min="0.3" max="1.2" step="0.05" value="0.5"></label>
+      <svg class="xsec" id="xsec" viewBox="0 0 300 92" role="img" aria-label="Schematic cross-section of the plate pack"></svg>
+    </section>
+
+    <section class="ctl" aria-labelledby="hGasket">
+      <h2 id="hGasket">Gasket line</h2>
+      <label class="check" for="chkGasket"><input type="checkbox" id="chkGasket"> Edit the gasket line</label>
+      <div class="row"><button type="button" class="btn" id="btnResetGasket">Reset gasket</button></div>
+      <p class="hint">The gasket seals the channel, so water flows only inside it. With editing on, drag its handles to change how it wraps around the ports.</p>
+    </section>
+
+    <section class="ctl" aria-labelledby="hView">
+      <h2 id="hView">View</h2>
+      <div class="seg modes" role="group" aria-label="Colour the plate by" id="segMode">
+        <button type="button" data-v="speed" aria-pressed="true">Speed</button>
+        <button type="button" data-v="pressure" aria-pressed="false">Pressure</button>
+        <button type="button" data-v="age" aria-pressed="false">Age</button>
+        <button type="button" data-v="vort" aria-pressed="false">Swirl</button>
+        <button type="button" class="wide" data-v="temp" aria-pressed="false">Temperature</button>
+        <button type="button" class="wide" data-v="htc" aria-pressed="false">Heat transfer</button>
+        <button type="button" class="wide" data-v="turb" aria-pressed="false">Turbulence</button>
+      </div>
+      <div class="checks">
+        <label class="check" for="chkParticles"><input type="checkbox" id="chkParticles" checked> Particles</label>
+        <label class="check" for="chkStreams"><input type="checkbox" id="chkStreams" checked> Streamlines</label>
+        <label class="check" for="chkArrows"><input type="checkbox" id="chkArrows"> Arrows</label>
+      </div>
+      <div class="row">
+        <button type="button" class="btn primary" id="btnPlay">Pause</button>
+        <button type="button" class="btn" id="btnRestart">Restart flow</button>
+        <button type="button" class="btn" id="btnRef">Pin as reference</button>
+      </div>
+      <p class="hint">Pin a design as a reference, change something, and every readout and the A–A profile show the comparison.</p>
+      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution areas carry an open "chocolate" stud pattern with low resistance that is the same in every direction, modelled with the same correlations at an effective 25° (assumed). The plate is shown stacked against an identical plate turned over (dashed ribs); the dots are where their ridges touch. In the ribbed area, particles travel in two layers that follow each plate's furrows. They flow round the contact points, churn in the recirculation behind them, and switch furrows there: rarely below about 45°, often above 60°, where the flow zigzags. Turbulence is estimated from the energy the ribs take out of the flow beyond plain wall friction, switching on between Re ≈ 60 and 600 (calibrated, not measured). The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
+    </section>
+  </aside>
+</main>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants ================= */
+const W = 200, H = 440, CELL = 2;
+const NX = W / CELL, NY = H / CELL, NC = NX * NY;
+const DX = CELL / 1000;                // cell size, m
+const GASKET_W = 5;                    // visible gasket width, mm
+const NCTRL = 16;                      // control points per port
+const K_STEEL = 16;                    // W/m·K, AISI 316
+const NU_FLAT = 7.54;                  // laminar parallel plates, both walls isothermal
+const DEG = 180 / Math.PI;
+const PT = [10, 20, 40, 60, 80];
+const PROPS = {
+  rho: [999.7, 998.2, 992.2, 983.2, 971.8], mu: [1.306e-3, 1.002e-3, 0.653e-3, 0.467e-3, 0.355e-3],
+  k: [0.580, 0.598, 0.631, 0.654, 0.670], cp: [4192, 4182, 4179, 4185, 4197]
+};
+function waterAt(T) {
+  T = Math.min(80, Math.max(10, T)); let i = 0; while (i < 3 && T > PT[i + 1]) i++;
+  const f = (T - PT[i]) / (PT[i + 1] - PT[i]), o = {};
+  for (const key in PROPS) o[key] = PROPS[key][i] + (PROPS[key][i + 1] - PROPS[key][i]) * f;
+  o.Pr = o.mu * o.cp / o.k; return o;
+}
+const DEFAULT_GASKET = [
+  [14, 130], [50, 116], [84, 96], [104, 70], [116, 40], [136, 24], [164, 21], [182, 26], [187, 44], [187, 220],
+  [187, 396], [182, 414], [164, 419], [136, 416], [116, 400], [104, 370], [84, 344], [50, 324], [14, 310], [14, 220]
+];
+const DEFAULT_PORTS = {
+  in:  { cx: 146, cy: 66,  size: 35, aspect: 1, rot: 0, preset: 'circle' },
+  out: { cx: 146, cy: 374, size: 35, aspect: 1, rot: 0, preset: 'circle' }
+};
+const PLATE_REGION = { x0: -26, y0: -10, w: 240, h: 474 };
+
+/* ================= state ================= */
+const state = {
+  ports: {}, gasket: DEFAULT_GASKET.map(p => p.slice()), sectionY: 220,
+  zones: { dist: true, chev: true, distLen: 128, phi: 60, show: true },
+  params: { vPort: 2.1, qLmin: 6.1, nCh: 20, hold: 'speed', gap: 2.0, thick: 0.5, Tin: 60, Tc: 15 },
+  view: { mode: 'speed', particles: true, streams: true, arrows: false },
+  sel: 'in', editGasket: false, running: true, ref: null
+};
+
+/* ================= geometry helpers ================= */
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const sp = (x, e) => Math.sign(x) * Math.pow(Math.abs(x), e);
+
+function lerpT(p, q, ta, tb, t) {
+  const d = tb - ta || 1e-9, a = (tb - t) / d, b = (t - ta) / d;
+  return [a * p[0] + b * q[0], a * p[1] + b * q[1]];
+}
+// centripetal Catmull-Rom through a closed control polygon
+function catmullRomClosed(pts, segFn) {
+  const n = pts.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    const t0 = 0;
+    const t1 = t0 + Math.max(Math.sqrt(dist(p0, p1)), 1e-3);
+    const t2 = t1 + Math.max(Math.sqrt(dist(p1, p2)), 1e-3);
+    const t3 = t2 + Math.max(Math.sqrt(dist(p2, p3)), 1e-3);
+    const segs = typeof segFn === 'function' ? segFn(p1, p2) : segFn;
+    for (let s = 0; s < segs; s++) {
+      const t = t1 + (t2 - t1) * s / segs;
+      const A1 = lerpT(p0, p1, t0, t1, t), A2 = lerpT(p1, p2, t1, t2, t), A3 = lerpT(p2, p3, t2, t3, t);
+      const B1 = lerpT(A1, A2, t0, t2, t), B2 = lerpT(A2, A3, t1, t3, t);
+      out.push(lerpT(B1, B2, t1, t2, t));
+    }
+  }
+  return out;
+}
+// gasket line: vertical spans are straight side seals; the rest are smooth Hermite curves that leave the sides tangentially
+const isSide = (a, b) => Math.abs(a[0] - b[0]) < 0.5;
+function gasketCurve(pts) {
+  const n = pts.length, out = [];
+  const unit = (x, y) => { const m = Math.hypot(x, y) || 1; return [x / m, y / m]; };
+  const straight = pts.map((a, i) => isSide(a, pts[(i + 1) % n]));
+  const tan = pts.map((p1, i) => {
+    const im = (i - 1 + n) % n, p0 = pts[im], p2 = pts[(i + 1) % n];
+    if (straight[im]) return unit(p1[0] - p0[0], p1[1] - p0[1]);
+    if (straight[i]) return unit(p2[0] - p1[0], p2[1] - p1[1]);
+    const a = unit(p1[0] - p0[0], p1[1] - p0[1]), b = unit(p2[0] - p1[0], p2[1] - p1[1]);
+    return unit(a[0] + b[0], a[1] + b[1]);
+  });
+  for (let i = 0; i < n; i++) {
+    const p1 = pts[i], p2 = pts[(i + 1) % n], L = dist(p1, p2);
+    out.push([p1[0], p1[1]]);
+    if (straight[i] || L < 1e-6) continue;
+    const m1 = tan[i], m2 = tan[(i + 1) % n], segs = clamp(Math.ceil(L / 2), 2, 60);
+    for (let s = 1; s < segs; s++) {
+      const t = s / segs, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push([h00 * p1[0] + h10 * L * m1[0] + h01 * p2[0] + h11 * L * m2[0], h00 * p1[1] + h10 * L * m1[1] + h01 * p2[1] + h11 * L * m2[1]]);
+    }
+  }
+  return out;
+}
+function polyArea(pp) {
+  let a = 0;
+  for (let i = 0, n = pp.length; i < n; i++) { const q = pp[i], r = pp[(i + 1) % n]; a += q[0] * r[1] - r[0] * q[1]; }
+  return a / 2;
+}
+function polyPerimeter(pp) { let s = 0; for (let i = 0; i < pp.length; i++) s += dist(pp[i], pp[(i + 1) % pp.length]); return s; }
+function pointInPoly(x, y, pp) {
+  let inside = false;
+  for (let i = 0, j = pp.length - 1; i < pp.length; j = i++) {
+    const xi = pp[i][0], yi = pp[i][1], xj = pp[j][0], yj = pp[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function segDist(px0, py0, a, b) {
+  const vx = b[0] - a[0], vy = b[1] - a[1], wx = px0 - a[0], wy = py0 - a[1];
+  const L = vx * vx + vy * vy; let t = L > 0 ? (wx * vx + wy * vy) / L : 0; t = clamp(t, 0, 1);
+  return Math.hypot(px0 - a[0] - t * vx, py0 - a[1] - t * vy);
+}
+function minDistToPoly(poly, ring, every) {
+  let m = Infinity;
+  for (let k = 0; k < poly.length; k += every) for (let e = 0; e < ring.length; e++) {
+    const d = segDist(poly[k][0], poly[k][1], ring[e], ring[(e + 1) % ring.length]); if (d < m) m = d;
+  }
+  return m;
+}
+function rasterize(poly, out) {
+  const n = poly.length, xs = [];
+  for (let j = 0; j < NY; j++) {
+    const yc = (j + 0.5) * CELL; xs.length = 0;
+    for (let e = 0; e < n; e++) {
+      const a = poly[e], b = poly[(e + 1) % n];
+      if ((a[1] <= yc) !== (b[1] <= yc)) xs.push(a[0] + (yc - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+    }
+    xs.sort((p1, q1) => p1 - q1);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const i0 = Math.max(0, Math.ceil(xs[k] / CELL - 0.5)), i1 = Math.min(NX - 1, Math.floor(xs[k + 1] / CELL - 0.5));
+      for (let i = i0; i <= i1; i++) out[i + NX * j] = 1;
+    }
+  }
+}
+function pathFrom(poly) {
+  const pa = new Path2D();
+  poly.forEach((q, i) => i ? pa.lineTo(q[0], q[1]) : pa.moveTo(q[0], q[1]));
+  pa.closePath(); return pa;
+}
+
+/* ================= port shapes ================= */
+const PRESETS = [
+  { id: 'circle',  label: 'Circle',  f: (c, s) => [c, s] },
+  { id: 'rsquare', label: 'Square',  f: (c, s) => [sp(c, 0.35), sp(s, 0.35)] },
+  { id: 'slot',    label: 'Slot',    f: (c, s) => [1.7 * sp(c, 0.55), 0.62 * sp(s, 0.55)] },
+  { id: 'tear',    label: 'Teardrop', f: (c, s) => { const d = Math.max(s, 0); return [c * (1 - 0.35 * Math.pow(d, 1.5)), s * (1 + 0.8 * d * d)]; } },
+  { id: 'dshape',  label: 'D-shape', f: (c, s) => [c, Math.min(s, 0.5)] },
+  { id: 'diamond', label: 'Diamond', f: (c, s) => [sp(c, 1.5), 1.25 * sp(s, 1.5)] }
+];
+// unit shape normalised to the area of a unit circle; +y points into the plate field
+function makeBase(id, flip) {
+  const P = PRESETS.find(q => q.id === id) || PRESETS[0];
+  const pts = [];
+  for (let k = 0; k < NCTRL; k++) {
+    const t = 2 * Math.PI * k / NCTRL; const [x, y] = P.f(Math.cos(t), Math.sin(t));
+    pts.push([x, flip ? -y : y]);
+  }
+  const A = Math.abs(polyArea(catmullRomClosed(pts, 10)));
+  const sc = Math.sqrt(Math.PI / A);
+  return pts.map(([x, y]) => [x * sc, y * sc]);
+}
+function newPort(key) { const d = DEFAULT_PORTS[key]; return { ...d, base: makeBase(d.preset, key === 'out') }; }
+function baseToMM(pt, b) {
+  const r = pt.size / 2, sa = Math.sqrt(pt.aspect), th = pt.rot / DEG;
+  const x = b[0] * r * sa, y = b[1] * r / sa;
+  return [pt.cx + x * Math.cos(th) - y * Math.sin(th), pt.cy + x * Math.sin(th) + y * Math.cos(th)];
+}
+function mmToBase(pt, m) {
+  const r = pt.size / 2, sa = Math.sqrt(pt.aspect), th = -pt.rot / DEG;
+  const dx = m[0] - pt.cx, dy = m[1] - pt.cy;
+  const x = dx * Math.cos(th) - dy * Math.sin(th), y = dx * Math.sin(th) + dy * Math.cos(th);
+  return [x / (r * sa), y / (r / sa)];
+}
+const portCtrl = pt => pt.base.map(b => baseToMM(pt, b));
+const portPoly = pt => catmullRomClosed(portCtrl(pt), 10);
+
+state.ports.in = newPort('in');
+state.ports.out = newPort('out');
+
+/* ================= Martin chevron correlation tables ================= */
+// friction factor ξ(Re, φ) and Nusselt base (ξ·Re²·sin2φ)^0.374, φ = angle between flow and ribs
+const RE_L0 = -1, RE_SPAN = 6, NRE = 121, NPSI = 91;
+const XR = new Float32Array(NPSI * NRE), NUB = new Float32Array(NPSI * NRE);
+for (let a = 0; a < NPSI; a++) {
+  const phi = Math.min(a, 89.9) / DEG, c = Math.cos(phi);
+  for (let r = 0; r < NRE; r++) {
+    const Re = Math.pow(10, RE_L0 + RE_SPAN * r / (NRE - 1));
+    let x0, x1;
+    if (Re < 2000) { x0 = 64 / Re; x1 = 597 / Re + 3.85; }
+    else { x0 = Math.pow(1.8 * Math.log(Re) - 1.5, -2); x1 = 39 / Math.pow(Re, 0.289); }
+    const inv = c / Math.sqrt(0.18 * Math.tan(phi) + 0.36 * Math.sin(phi) + x0 / c) + (1 - c) / Math.sqrt(3.8 * x1);
+    const xi = 1 / (inv * inv);
+    XR[a * NRE + r] = xi * Re;
+    NUB[a * NRE + r] = Math.pow(xi * Re * Re * Math.sin(2 * phi), 0.374);
+  }
+}
+function lut(tab, Re, psi) {
+  let fr = (Math.log10(Re > 0.1 ? Re : 0.1) - RE_L0) / RE_SPAN * (NRE - 1);
+  if (fr > NRE - 1.001) fr = NRE - 1.001;
+  const r0 = fr | 0, tr = fr - r0;
+  let fa = psi < 0 ? 0 : psi > 90 ? 90 : psi; if (fa > 89.999) fa = 89.999;
+  const a0 = fa | 0, ta = fa - a0, k = a0 * NRE + r0;
+  return (tab[k] * (1 - tr) + tab[k + 1] * tr) * (1 - ta) + (tab[k + NRE] * (1 - tr) + tab[k + NRE + 1] * tr) * ta;
+}
+// the two walls carry ribs at +φ and −φ to the plate axis; flow at angle θ meets them at |θ−φ| and θ+φ
+let RA1 = 0, RA2 = 0;
+function ribAngles(a, b, phi) {
+  const th = Math.atan2(Math.abs(a), Math.abs(b)) * DEG, q = th + phi;
+  RA1 = Math.abs(th - phi); RA2 = q <= 90 ? q : 180 - q;
+}
+
+/* ================= simulation fields ================= */
+const fluid = new Uint8Array(NC), portIn = new Uint8Array(NC), portOut = new Uint8Array(NC), tmpMask = new Uint8Array(NC);
+const flags = new Uint8Array(NC), zoneC = new Uint8Array(NC);
+const R = NX + 1, NU = R * NY, NV = NX * (NY + 1);
+const u = new Float32Array(NU), u1 = new Float32Array(NU), v = new Float32Array(NV), v1 = new Float32Array(NV);
+const bU = new Float32Array(NU), bV = new Float32Array(NV);
+const uOpen = new Uint8Array(NU), vOpen = new Uint8Array(NV), zoneU = new Uint8Array(NU), zoneV = new Uint8Array(NV);
+const p = new Float32Array(NC), bRHS = new Float32Array(NC), S = new Float32Array(NC);
+let age = new Float32Array(NC), age1 = new Float32Array(NC), T = new Float32Array(NC), T1 = new Float32Array(NC);
+const uc = new Float32Array(NC), vc = new Float32Array(NC), spd = new Float32Array(NC), tCell = new Float32Array(NC);
+const Uloc = new Float32Array(NC), lam = new Float32Array(NC), vortF = new Float32Array(NC);
+let fluidList = new Int32Array(0), cellIU = new Int32Array(0), inCells = [], outCells = [];
+
+const G = {
+  gasketPoly: [], gasketPath: null, inPoly: [], outPoly: [], sealPoly: {}, portPath: {}, sealPath: {}, valid: false, issues: [],
+  areaIn: 0, areaOut: 0, fluidArea: 0, clearance: { in: 0, out: 0 }, streams: [], Q: 0, vPortEff: 0, Sin: 0, Sout: 0,
+  F: waterAt(37.5), pattern: null, streamsDirty: true
+};
+// The distribution area carries an open "chocolate" stud pattern: few, large contact points, so its resistance is
+// low and the same in every direction (as described in plate patents). It is modelled with Martin's correlation at an
+// effective corrugation angle of 25° (assumed), applied whatever the flow direction.
+const DIST_PSI = 25;
+// Distribution area boundaries per grid column (mm): a triangle under the diagonal gasket, as on real plates.
+const yTopB = new Float32Array(NX), yBotB = new Float32Array(NX);
+function computeZoneBounds() {
+  const z = state.zones, band = 0;
+  const rawT = new Float32Array(NX), rawB = new Float32Array(NX), has = new Uint8Array(NX);
+  for (let i = 0; i < NX; i++) {
+    let jt = -1, jb = -1;
+    for (let j = 0; j < NY; j++) if (fluid[i + NX * j]) { jt = j; break; }
+    for (let j = NY - 1; j >= 0; j--) if (fluid[i + NX * j]) { jb = j; break; }
+    has[i] = jt >= 0 ? 1 : 0;
+    rawT[i] = jt < 0 ? z.distLen : Math.max(z.distLen, jt * CELL + band);
+    rawB[i] = jb < 0 ? H - z.distLen : Math.min(H - z.distLen, (jb + 1) * CELL - band);
+  }
+  for (let i = 0; i < NX; i++) {
+    let st = 0, sb = 0, n = 0;
+    for (let k = Math.max(0, i - 5); k <= Math.min(NX - 1, i + 5); k++) if (has[k]) { st += rawT[k]; sb += rawB[k]; n++; }
+    let t = n ? st / n : rawT[i], b = n ? sb / n : rawB[i];
+    if (t > b) t = b = (t + b) / 2;
+    yTopB[i] = t; yBotB[i] = b;
+  }
+}
+function zoneAt(i, y) {
+  i = i < 0 ? 0 : i > NX - 1 ? NX - 1 : i;
+  const z = state.zones, top = y < yTopB[i], bot = y > yBotB[i];
+  if (top || bot) return z.dist ? (top ? 1 : 3) : (z.chev ? 2 : 0);
+  return z.chev ? 2 : 0;
+}
+function rebuildZones() {
+  computeZoneBounds();
+  for (let c = 0; c < NC; c++) zoneC[c] = fluid[c] && !portIn[c] && !portOut[c] ? zoneAt(c % NX, ((c / NX | 0) + 0.5) * CELL) : 0;
+  for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
+    const iu = i + R * j; zoneU[iu] = 0;
+    if (!uOpen[iu]) continue;
+    const cl = i - 1 + NX * j, cr = cl + 1;
+    if (portIn[cl] || portIn[cr] || portOut[cl] || portOut[cr]) continue;
+    const z = zoneAt(i - 1, (j + 0.5) * CELL); zoneU[iu] = z;
+  }
+  for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
+    const iv = i + NX * j; zoneV[iv] = 0;
+    if (!vOpen[iv]) continue;
+    const ct = iv - NX, cb = iv;
+    if (portIn[ct] || portIn[cb] || portOut[ct] || portOut[cb]) continue;
+    const z = zoneAt(i, j * CELL); zoneV[iv] = z;
+  }
+  buildPattern();
+}
+
+function rebuildGeometry() {
+  G.gasketPoly = gasketCurve(state.gasket);
+  G.gasketPath = pathFrom(G.gasketPoly);
+  G.inPoly = portPoly(state.ports.in);
+  G.outPoly = portPoly(state.ports.out);
+  G.portPath.in = pathFrom(G.inPoly);
+  G.portPath.out = pathFrom(G.outPoly);
+  // sealed cold-side ports mirror the open ports across the plate centreline
+  G.sealPoly.in = G.inPoly.map(q => [W - q[0], q[1]]);
+  G.sealPoly.out = G.outPoly.map(q => [W - q[0], q[1]]);
+  G.sealPath.in = pathFrom(G.sealPoly.in); G.sealPath.out = pathFrom(G.sealPoly.out);
+  G.areaIn = Math.abs(polyArea(G.inPoly));
+  G.areaOut = Math.abs(polyArea(G.outPoly));
+
+  const wasFluid = fluid.slice();
+  fluid.fill(0); rasterize(G.gasketPoly, fluid);
+  // the outermost ring of cells is plate edge, never channel
+  for (let i = 0; i < NX; i++) { fluid[i] = 0; fluid[i + NX * (NY - 1)] = 0; }
+  for (let j = 0; j < NY; j++) { fluid[NX * j] = 0; fluid[NX - 1 + NX * j] = 0; }
+  tmpMask.fill(0); rasterize(G.inPoly, tmpMask);
+  for (let c = 0; c < NC; c++) portIn[c] = tmpMask[c] & fluid[c];
+  tmpMask.fill(0); rasterize(G.outPoly, tmpMask);
+  let overlap = false;
+  for (let c = 0; c < NC; c++) {
+    portOut[c] = tmpMask[c] & fluid[c];
+    if (portOut[c] && portIn[c]) { overlap = true; portOut[c] = 0; portIn[c] = 0; }
+  }
+
+  const list = [], ius = [];
+  inCells = []; outCells = [];
+  const Tc = state.params.Tc;
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const c = i + NX * j;
+    if (!fluid[c]) { flags[c] = 0; p[c] = 0; age[c] = 0; T[c] = Tc; continue; }
+    let f = 0;
+    if (fluid[c - 1]) f |= 1;
+    if (fluid[c + 1]) f |= 2;
+    if (fluid[c - NX]) f |= 4;
+    if (fluid[c + NX]) f |= 8;
+    flags[c] = f; list.push(c); ius.push(i + R * j);
+    if (portIn[c]) inCells.push(c);
+    if (portOut[c]) outCells.push(c);
+    if (!wasFluid[c]) { age[c] = 0; T[c] = Tc; }
+  }
+  fluidList = Int32Array.from(list); cellIU = Int32Array.from(ius);
+  G.fluidArea = list.length * CELL * CELL;
+
+  for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
+    const iu = i + R * j;
+    const open = i > 0 && i < NX && fluid[i - 1 + NX * j] && fluid[i + NX * j];
+    uOpen[iu] = open ? 1 : 0; if (!open) { u[iu] = 0; bU[iu] = 0; }
+  }
+  for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
+    const iv = i + NX * j;
+    const open = j > 0 && j < NY && fluid[i + NX * (j - 1)] && fluid[i + NX * j];
+    vOpen[iv] = open ? 1 : 0; if (!open) { v[iv] = 0; bV[iv] = 0; }
+  }
+
+  // connectivity inlet -> outlet
+  let connected = false;
+  if (inCells.length && outCells.length) {
+    const seen = new Uint8Array(NC), stack = inCells.slice();
+    inCells.forEach(c => seen[c] = 1);
+    while (stack.length) {
+      const c = stack.pop();
+      if (portOut[c]) { connected = true; break; }
+      const f = flags[c];
+      if ((f & 1) && !seen[c - 1]) { seen[c - 1] = 1; stack.push(c - 1); }
+      if ((f & 2) && !seen[c + 1]) { seen[c + 1] = 1; stack.push(c + 1); }
+      if ((f & 4) && !seen[c - NX]) { seen[c - NX] = 1; stack.push(c - NX); }
+      if ((f & 8) && !seen[c + NX]) { seen[c + NX] = 1; stack.push(c + NX); }
+    }
+  }
+
+  // clearances & containment
+  const issues = [];
+  for (const key of ['in', 'out']) {
+    const poly = key === 'in' ? G.inPoly : G.outPoly;
+    let outside = false;
+    for (let k = 0; k < poly.length; k += 2) if (!pointInPoly(poly[k][0], poly[k][1], G.gasketPoly)) { outside = true; break; }
+    const minD = minDistToPoly(poly, G.gasketPoly, 2);
+    G.clearance[key] = outside ? -minD : minD;
+    const name = key === 'in' ? 'Inlet' : 'Outlet';
+    if (outside) issues.push({ level: 'critical', text: `${name} port crosses the gasket line. The part outside the gasket is sealed off.` });
+    else if (minD < 3) issues.push({ level: 'warning', text: `${name} port is only ${minD.toFixed(1)} mm from the gasket. Under 3 mm leaves little room for the gasket groove.` });
+    const seal = G.sealPoly[key];
+    let sealInside = false;
+    for (let k = 0; k < seal.length; k += 4) if (pointInPoly(seal[k][0], seal[k][1], G.gasketPoly)) { sealInside = true; break; }
+    const sd = minDistToPoly(seal, G.gasketPoly, 4);
+    if (sealInside || sd < GASKET_W + 2) issues.push({ level: 'warning', text: `The sealed cold-side port beside the ${name.toLowerCase()} runs into the channel gasket. Shrink the port or move the gasket.` });
+  }
+  if (overlap) issues.push({ level: 'critical', text: 'The two ports overlap. Move them apart.' });
+  if (!inCells.length || !outCells.length) issues.push({ level: 'critical', text: 'A port lies completely outside the gasket, so no water can pass.' });
+  else if (!connected) issues.push({ level: 'critical', text: 'The gasket line cuts the inlet off from the outlet, so no water can pass.' });
+  G.issues = issues; VER.geom++;
+  G.valid = connected && inCells.length > 0 && outCells.length > 0;
+  rebuildZones();
+  updateSources();
+  G.streamsDirty = true;
+}
+
+function updateSources() {
+  const P = state.params;
+  G.F = waterAt((P.Tin + P.Tc) / 2);
+  const Ain = G.areaIn * 1e-6;
+  if (P.hold === 'speed') { G.Q = P.vPort * Ain / P.nCh; G.vPortEff = P.vPort; }
+  else { G.Q = P.qLmin / 60000; G.vPortEff = Ain > 0 ? G.Q * P.nCh / Ain : 0; }
+  S.fill(0);
+  if (!G.valid) { G.Sin = G.Sout = 0; return; }
+  const h = P.gap / 1000;
+  G.Sin = G.Q / (h * inCells.length * DX * DX);
+  G.Sout = -G.Q / (h * outCells.length * DX * DX);
+  for (const c of inCells) S[c] = G.Sin;
+  for (const c of outCells) S[c] = G.Sout;
+}
+
+/* ---------- sampling ---------- */
+function sampleU(x, y) {
+  let fx = x, fy = y - 0.5;
+  fx = fx < 0 ? 0 : fx > NX ? NX : fx; fy = fy < 0 ? 0 : fy > NY - 1 ? NY - 1 : fy;
+  let i0 = fx | 0, j0 = fy | 0; if (i0 > NX - 1) i0 = NX - 1; if (j0 > NY - 2) j0 = NY - 2;
+  const tx = fx - i0, ty = fy - j0, k = i0 + R * j0;
+  return (u[k] * (1 - tx) + u[k + 1] * tx) * (1 - ty) + (u[k + R] * (1 - tx) + u[k + R + 1] * tx) * ty;
+}
+function sampleV(x, y) {
+  let fx = x - 0.5, fy = y;
+  fx = fx < 0 ? 0 : fx > NX - 1 ? NX - 1 : fx; fy = fy < 0 ? 0 : fy > NY ? NY : fy;
+  let i0 = fx | 0, j0 = fy | 0; if (i0 > NX - 2) i0 = NX - 2; if (j0 > NY - 1) j0 = NY - 1;
+  const tx = fx - i0, ty = fy - j0, k = i0 + NX * j0;
+  return (v[k] * (1 - tx) + v[k + 1] * tx) * (1 - ty) + (v[k + NX] * (1 - tx) + v[k + NX + 1] * tx) * ty;
+}
+function sampleCell(f, x, y, fallback) {
+  let fx = x - 0.5, fy = y - 0.5;
+  fx = fx < 0 ? 0 : fx > NX - 1 ? NX - 1 : fx; fy = fy < 0 ? 0 : fy > NY - 1 ? NY - 1 : fy;
+  let i0 = fx | 0, j0 = fy | 0; if (i0 > NX - 2) i0 = NX - 2; if (j0 > NY - 2) j0 = NY - 2;
+  const tx = fx - i0, ty = fy - j0, k = i0 + NX * j0;
+  const w00 = (1 - tx) * (1 - ty) * fluid[k], w10 = tx * (1 - ty) * fluid[k + 1];
+  const w01 = (1 - tx) * ty * fluid[k + NX], w11 = tx * ty * fluid[k + NX + 1];
+  const ws = w00 + w10 + w01 + w11;
+  if (ws < 1e-6) return fallback;
+  return (f[k] * w00 + f[k + 1] * w10 + f[k + NX] * w01 + f[k + NX + 1] * w11) / ws;
+}
+
+/* ---------- solver step ---------- */
+let simTime = 0;
+function step(dt, iters) {
+  const P = state.params, F = G.F;
+  const h = P.gap / 1000, Dh = 2 * h, inv = dt / DX;
+  const kFlat = 12 * F.mu / (F.rho * h * h), kChev = F.mu / (2 * F.rho * Dh * Dh), reC = F.rho * Dh / F.mu, phi = state.zones.phi;
+  const fFlat = 1 / (1 + kFlat * dt);
+
+  // 1. semi-Lagrangian advection (RK2 backtrace) into u1, v1
+  for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
+    const iu = i + R * j;
+    if (!uOpen[iu]) { u1[iu] = 0; continue; }
+    const x = i, y = j + 0.5, a = u[iu], b = sampleV(x, y);
+    const xm = x - 0.5 * inv * a, ym = y - 0.5 * inv * b;
+    u1[iu] = sampleU(x - inv * sampleU(xm, ym), y - inv * sampleV(xm, ym));
+  }
+  for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
+    const iv = i + NX * j;
+    if (!vOpen[iv]) { v1[iv] = 0; continue; }
+    const x = i + 0.5, y = j, a = sampleU(x, y), b = v[iv];
+    const xm = x - 0.5 * inv * a, ym = y - 0.5 * inv * b;
+    v1[iv] = sampleV(x - inv * sampleU(xm, ym), y - inv * sampleV(xm, ym));
+  }
+
+  // 2. implicit wall friction, zone by zone; β = how much of the pressure push survives the friction
+  for (let j = 0; j < NY; j++) for (let i = 0; i <= NX; i++) {
+    const iu = i + R * j;
+    if (!uOpen[iu]) { u[iu] = 0; bU[iu] = 0; continue; }
+    const a = u1[iu], z = zoneU[iu];
+    if (z === 0) { u[iu] = a * fFlat; bU[iu] = fFlat; continue; }
+    const c0 = i - 1 + NX * j, b = 0.25 * (v1[c0] + v1[c0 + 1] + v1[c0 + NX] + v1[c0 + NX + 1]);
+    if (z === 2) {
+      const Re = reC * Math.hypot(a, b); ribAngles(a, b, phi);
+      const k = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev, f = 1 / (1 + k * dt);
+      u[iu] = a * f; bU[iu] = f;
+    } else {
+      const Re = reC * Math.hypot(a, b);
+      const k = lut(XR, Re, DIST_PSI) * kChev, f = 1 / (1 + k * dt);
+      u[iu] = a * f; bU[iu] = f;
+    }
+  }
+  for (let j = 0; j <= NY; j++) for (let i = 0; i < NX; i++) {
+    const iv = i + NX * j;
+    if (!vOpen[iv]) { v[iv] = 0; bV[iv] = 0; continue; }
+    const b = v1[iv], z = zoneV[iv];
+    if (z === 0) { v[iv] = b * fFlat; bV[iv] = fFlat; continue; }
+    const k0 = i + R * (j - 1), a = 0.25 * (u1[k0] + u1[k0 + 1] + u1[k0 + R] + u1[k0 + R + 1]);
+    if (z === 2) {
+      const Re = reC * Math.hypot(a, b); ribAngles(a, b, phi);
+      const k = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev, f = 1 / (1 + k * dt);
+      v[iv] = b * f; bV[iv] = f;
+    } else {
+      const Re = reC * Math.hypot(a, b);
+      const k = lut(XR, Re, DIST_PSI) * kChev, f = 1 / (1 + k * dt);
+      v[iv] = b * f; bV[iv] = f;
+    }
+  }
+
+  // 3. pressure projection with friction-weighted faces: div(u) = S (port source / sink)
+  const coef = F.rho * DX * DX / dt, L = fluidList.length;
+  for (let n = 0; n < L; n++) {
+    const c = fluidList[n], iu = cellIU[n];
+    bRHS[c] = coef * ((u[iu + 1] - u[iu] + v[c + NX] - v[c]) / DX - S[c]);
+  }
+  const omega = 1.85;
+  for (let it = 0; it < iters; it++) {
+    for (let n = 0; n < L; n++) {
+      const c = fluidList[n], iu = cellIU[n];
+      const wl = bU[iu], wr = bU[iu + 1], wt = bV[c], wb = bV[c + NX], d = wl + wr + wt + wb;
+      if (d <= 0) continue;
+      const pc = p[c];
+      p[c] = pc + omega * ((wl * p[c - 1] + wr * p[c + 1] + wt * p[c - NX] + wb * p[c + NX] - bRHS[c]) / d - pc);
+    }
+  }
+  const g = dt / (F.rho * DX);
+  for (let j = 0; j < NY; j++) for (let i = 1; i < NX; i++) {
+    const iu = i + R * j; if (!uOpen[iu]) continue;
+    const c = i + NX * j; u[iu] -= bU[iu] * g * (p[c] - p[c - 1]);
+  }
+  for (let j = 1; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const iv = i + NX * j; if (!vOpen[iv]) continue;
+    v[iv] -= bV[iv] * g * (p[iv] - p[iv - NX]);
+  }
+
+  transportScalars(dt);
+  simTime += dt;
+}
+
+// 4. scalars: fluid age and temperature (cooled through both walls)
+function transportScalars(dt) {
+  const P = state.params, inv = dt / DX, L = fluidList.length;
+  const Tin = P.Tin, Tc = P.Tc;
+  for (let n = 0; n < L; n++) {
+    const c = fluidList[n], iu = cellIU[n], i = c % NX, j = (c / NX) | 0;
+    const a = 0.5 * (u[iu] + u[iu + 1]), b = 0.5 * (v[c] + v[c + NX]);
+    const xb = i + 0.5 - inv * a, yb = j + 0.5 - inv * b;
+    if (portIn[c]) { age1[c] = 0; T1[c] = Tin; continue; }
+    age1[c] = sampleCell(age, xb, yb, age[c]) + dt;
+    T1[c] = Tc + (sampleCell(T, xb, yb, T[c]) - Tc) * Math.exp(-lam[c] * dt);
+  }
+  let t = age; age = age1; age1 = t; t = T; T = T1; T1 = t;
+}
+
+/* ---------- local heat transfer coefficient and turbulence estimate ---------- */
+// Turbulence estimate: the ribs and contact points take energy out of the mean flow beyond plain laminar wall friction.
+// That excess, eps = (k − k_flat)·U² per kg, feeds the swirl and eddies. An energy-cascade scale over half the gap gives
+// a fluctuating velocity u′ ≈ C·γ·(eps·h/2)^(1/3), where γ ramps the flow from steady to unsteady across Re ≈ 60–600
+// (chevron channels are reported to turn unsteady from about Re 100). C = 0.5 is a calibration choice.
+const RE_T0 = 60, RE_T1 = 600, TURB_C = 0.5;
+const turbI = new Float32Array(NC), turbU = new Float32Array(NC);
+function computeThermal() {
+  const P = state.params, F = G.F, h = P.gap / 1000, Dh = 2 * h, reC = F.rho * Dh / F.mu;
+  const kFlat = 12 * F.mu / (F.rho * h * h), kChev = F.mu / (2 * F.rho * Dh * Dh);
+  const prf = 0.122 * Math.cbrt(F.Pr), wall = P.thick / 1000 / K_STEEL, phi = state.zones.phi, lamC = 2 / (F.rho * F.cp * h);
+  for (let n = 0; n < fluidList.length; n++) {
+    const c = fluidList[n];
+    let Nu = NU_FLAT, kc = kFlat;
+    const zc = zoneC[c], Re = reC * spd[c];
+    if (zc === 2) {
+      ribAngles(uc[c], vc[c], phi);
+      Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, RA1) + lut(NUB, Re, RA2)));
+      kc = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev;
+    } else if (zc === 1 || zc === 3) {
+      Nu = Math.max(NU_FLAT, prf * lut(NUB, Re, DIST_PSI));
+      kc = lut(XR, Re, DIST_PSI) * kChev;
+    }
+    const sp0 = spd[c], eps = Math.max(0, kc - kFlat) * sp0 * sp0;
+    const xg = clamp((Re - RE_T0) / (RE_T1 - RE_T0), 0, 1), gam = xg * xg * (3 - 2 * xg);
+    const up = (portIn[c] || portOut[c]) ? 0 : TURB_C * gam * Math.cbrt(eps * 0.5 * h);
+    turbU[c] = up; turbI[c] = sp0 > 1e-5 ? up / sp0 : 0;
+    const hc = Nu * F.k / Dh, U = 1 / (2 / hc + wall);
+    Uloc[c] = (portIn[c] || portOut[c]) ? 0 : U;
+    lam[c] = (portIn[c] || portOut[c]) ? 0 : U * lamC;
+  }
+}
+
+/* ---------- particles ---------- */
+const NPART = 1500;
+const px = new Float32Array(NPART), py = new Float32Array(NPART), ppx = new Float32Array(NPART), ppy = new Float32Array(NPART), plife = new Float32Array(NPART);
+// In a cross-corrugated channel the water near each plate runs along that plate's furrows; the two streams cross and
+// swap where they meet. Each particle rides in one of the two layers. The layer speeds are chosen so that their average
+// is exactly the computed (depth-averaged) flow, so the particles show the criss-cross without changing the flow.
+const player = new Int8Array(NPART);
+// turbulent velocity of each particle (m/s, Ornstein–Uhlenbeck process) and the last contact point it passed
+const tvx = new Float32Array(NPART), tvy = new Float32Array(NPART), lastC = new Int32Array(NPART).fill(-1);
+function gauss() { let u1 = Math.random(); if (u1 < 1e-12) u1 = 1e-12; return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * Math.random()); }
+function spawn(k, anywhere) {
+  let c;
+  if (!anywhere && inCells.length) c = inCells[(Math.random() * inCells.length) | 0];
+  else c = fluidList.length ? fluidList[(Math.random() * fluidList.length) | 0] : 0;
+  px[k] = ppx[k] = c % NX + Math.random(); py[k] = ppy[k] = ((c / NX) | 0) + Math.random();
+  plife[k] = anywhere ? Math.random() * 2 : 0;
+  player[k] = Math.random() < 0.5 ? 1 : -1;
+  tvx[k] = tvy[k] = 0; lastC[k] = -1;
+}
+function resetParticles() { for (let k = 0; k < NPART; k++) spawn(k, true); }
+function tauNominal() { return G.Q > 0 ? (G.fluidArea * 1e-6 * state.params.gap / 1000) / G.Q : Infinity; }
+function moveParticles(dt) {
+  const inv = dt / DX, pOut = 1 - Math.exp(-Math.abs(G.Sout) * dt), maxLife = Math.min(60, 6 * tauNominal());
+  const z = state.zones, ph = z.phi / DEG, sP = Math.sin(ph), cP = Math.cos(ph);
+  // below ~45° the water mostly stays in its groove ("cross flow"); above ~60° it zigzags, turning back at contact points
+  const follow = clamp(1 - (z.phi - 60) / 50, 0.6, 1), pSwap = clamp((z.phi - 40) / 25, 0.12, 0.8);
+  const pitch = ribPitch(), rPost = Math.max(0.8, 0.12 * pitch), halfGap = state.params.gap / 2000;
+  const ok = (qx, qy) => qx >= 0 && qy >= 0 && (qx | 0) < NX && (qy | 0) < NY && fluid[(qx | 0) + NX * (qy | 0)];
+  for (let k = 0; k < NPART; k++) {
+    const x = px[k], y = py[k]; ppx[k] = x; ppy[k] = y;
+    const a = sampleU(x, y), b = sampleV(x, y);
+    const xm = x + 0.5 * inv * a, ym = y + 0.5 * inv * b;
+    let mx = inv * sampleU(xm, ym), my = inv * sampleV(xm, ym), fx = 0, fy = 0;
+    const c0 = (x | 0) + NX * (y | 0), U = Math.hypot(a, b), inChev = z.chev && zoneC[c0] === 2;
+    if (inChev && U > 1e-4) {
+      const sg = x * CELL < W / 2 ? 1 : -1, L = player[k];
+      const s = b / cP + L * a / (sg * sP);
+      let vx = s * L * sg * sP, vy = s * cP;
+      const vm = Math.hypot(vx, vy); if (vm > 3 * U) { vx *= 3 * U / vm; vy *= 3 * U / vm; }
+      fx = follow * (vx - a) * inv; fy = follow * (vy - b) * inv;
+    }
+    // recirculation zone just behind a contact point: the water there is slow and churning
+    let slow = 1, boost = 1;
+    if (inChev && U > 1e-4) {
+      const nc = nearestContact(x * CELL, y * CELL);
+      if (nc) {
+        const rx = x * CELL - nc.x, ry = y * CELL - nc.y, along = (rx * a + ry * b) / U, lat = Math.abs(rx * b - ry * a) / U;
+        if (along > 0 && along < 4 * rPost && lat < 1.6 * rPost) { slow = 0.3; boost = 1.8; }
+      }
+    }
+    // turbulent fluctuation, correlated over the eddy turnover time (half the gap ÷ u′)
+    const sig = turbU[c0] * boost;
+    if (sig > 1e-6) {
+      const TL = clamp(halfGap / sig, 0.004, 0.25), dec = Math.exp(-dt / TL), amp = sig * Math.sqrt(1 - dec * dec);
+      tvx[k] = tvx[k] * dec + amp * gauss(); tvy[k] = tvy[k] * dec + amp * gauss();
+    } else { tvx[k] *= 0.5; tvy[k] *= 0.5; }
+    let nx = x + (mx + fx) * slow + tvx[k] * inv, ny = y + (my + fy) * slow + tvy[k] * inv;
+    if (inChev) {
+      const nc = nearestContact(nx * CELL, ny * CELL);
+      if (nc) {
+        let rx = nx * CELL - nc.x, ry = ny * CELL - nc.y, d = Math.hypot(rx, ry);
+        // the plates touch here, so water has to go round the contact point
+        if (d < rPost) {
+          if (d < 1e-6) { rx = -b; ry = a; d = Math.hypot(rx, ry) || 1; }
+          nx = (nc.x + rx / d * rPost) / CELL; ny = (nc.y + ry / d * rPost) / CELL;
+        }
+        // where the two furrow streams cross, water can switch to the other plate's furrows
+        if (d < 0.45 * pitch && nc.id !== lastC[k]) { lastC[k] = nc.id; if (Math.random() < pSwap) player[k] = -player[k]; }
+      }
+    }
+    if (!ok(nx, ny)) { player[k] = -player[k]; nx = x + mx; ny = y + my; }   // a furrow stream turns at the gasket
+    // at the herringbone apex one plate's furrows meet head-on, so the water hands over to the facing plate's furrows
+    else if (fx !== 0 && (x * CELL < W / 2) !== (nx * CELL < W / 2)) player[k] = -player[k];
+    if (ok(nx, ny)) { px[k] = nx; py[k] = ny; }
+    plife[k] += dt;
+    const c = (px[k] | 0) + NX * (py[k] | 0);
+    if (!fluid[c] || plife[k] > maxLife || (portOut[c] && Math.random() < pOut)) spawn(k, false);
+  }
+}
+
+/* ---------- streamlines from the inlet rim ---------- */
+function computeStreams() {
+  G.streams = [];
+  if (!G.valid) return;
+  const poly = G.inPoly, per = polyPerimeter(poly), nSeeds = 30, stepLen = per / nSeeds;
+  const seeds = []; let acc = stepLen / 2;
+  for (let i = 0; i < poly.length && seeds.length < nSeeds; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length], d = dist(a, b);
+    while (acc <= d && seeds.length < nSeeds) { const t = acc / d; seeds.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); acc += stepLen; }
+    acc -= d;
+  }
+  const dir = (x, y) => { const a = sampleU(x, y), b = sampleV(x, y), m = Math.hypot(a, b); return m < 1e-5 ? null : [a / m, b / m]; };
+  for (const s of seeds) {
+    let x = s[0] / CELL, y = s[1] / CELL; const line = [[x * CELL, y * CELL]];
+    for (let n = 0; n < 2600; n++) {
+      const d1 = dir(x, y); if (!d1) break;
+      const d2 = dir(x + 0.25 * d1[0], y + 0.25 * d1[1]); if (!d2) break;
+      x += 0.5 * d2[0]; y += 0.5 * d2[1];
+      const ci = x | 0, cj = y | 0;
+      if (x < 0 || y < 0 || ci >= NX || cj >= NY || !fluid[ci + NX * cj]) break;
+      if (n % 2 === 0) line.push([x * CELL, y * CELL]);
+      if (portOut[ci + NX * cj]) { line.push([x * CELL, y * CELL]); break; }
+    }
+    if (line.length > 4) G.streams.push(line);
+  }
+}
+
+/* ---------- pressing pattern (drawn in plate mm) ---------- */
+// corrugation pitch scales with pressing depth (pitch ≈ 3.5 × depth on typical plates)
+const ribPitch = () => clamp(3.5 * state.params.gap, 5, 14);
+// contact points between this plate and the identical plate turned over against it, with a spatial hash for lookups
+const CT = { xs: new Float32Array(0), ys: new Float32Array(0), grid: [], gs: 7, gnx: 1, gny: 1 };
+function nearestContact(xm, ym) {
+  const gx = Math.floor(xm / CT.gs), gy = Math.floor(ym / CT.gs);
+  let best = -1, bd = Infinity;
+  for (let j = gy - 1; j <= gy + 1; j++) {
+    if (j < 0 || j >= CT.gny) continue;
+    for (let i = gx - 1; i <= gx + 1; i++) {
+      if (i < 0 || i >= CT.gnx) continue;
+      const cell = CT.grid[i + CT.gnx * j]; if (!cell) continue;
+      for (const id of cell) { const d = (CT.xs[id] - xm) ** 2 + (CT.ys[id] - ym) ** 2; if (d < bd) { bd = d; best = id; } }
+    }
+  }
+  return best < 0 ? null : { id: best, x: CT.xs[best], y: CT.ys[best], d: Math.sqrt(bd) };
+}
+function buildPattern() {
+  const z = state.zones, ribs = new Path2D(), ribsB = new Path2D(), contacts = new Path2D(), lattice = new Path2D(), centre = new Path2D();
+  let chevTop = 0, chevBot = H;
+  if (z.dist) { chevTop = Infinity; chevBot = -Infinity; for (let i = 0; i < NX; i++) { chevTop = Math.min(chevTop, yTopB[i]); chevBot = Math.max(chevBot, yBotB[i]); } }
+  const regions = { chev: null, dist: null };
+  const xs = i => (i + 0.5) * CELL;
+  if (z.chev && chevBot > chevTop) {
+    const phi = z.phi / DEG, pitch = ribPitch(), sx = Math.sin(phi), cy = Math.cos(phi);
+    const stepC = pitch / sx, Lr = (W / 2 + 4) / sx;
+    const aLines = [], bLines = [];
+    // this plate: a V pointing down
+    for (let c0 = chevTop; c0 <= chevBot + Lr * cy + stepC; c0 += stepC) {
+      aLines.push(c0);
+      ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 - Lr * sx, c0 - Lr * cy);
+      ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 + Lr * sx, c0 - Lr * cy);
+    }
+    // the identical plate turned over against it: its V points up, so its ridges cross these ones
+    for (let d0 = chevTop - Lr * cy - stepC / 2; d0 <= chevBot + stepC; d0 += stepC) {
+      bLines.push(d0);
+      ribsB.moveTo(W / 2, d0); ribsB.lineTo(W / 2 - Lr * sx, d0 + Lr * cy);
+      ribsB.moveTo(W / 2, d0); ribsB.lineTo(W / 2 + Lr * sx, d0 + Lr * cy);
+    }
+    // the plates touch wherever a ridge of one crosses a ridge of the other
+    const cx = [], cyy = [], rC = Math.max(0.6, 0.11 * pitch);
+    for (const c0 of aLines) for (const d0 of bLines) {
+      if (d0 >= c0) continue;
+      const t = (c0 - d0) / (2 * cy); if (t * sx > W / 2) continue;
+      const yy = (c0 + d0) / 2;
+      for (const xx of [W / 2 - t * sx, W / 2 + t * sx]) {
+        const ci = Math.floor(xx / CELL), cj = Math.floor(yy / CELL);
+        if (ci < 0 || cj < 0 || ci >= NX || cj >= NY || zoneC[ci + NX * cj] !== 2) continue;
+        cx.push(xx); cyy.push(yy); contacts.moveTo(xx + rC, yy); contacts.arc(xx, yy, rC, 0, 2 * Math.PI);
+      }
+    }
+    CT.xs = Float32Array.from(cx); CT.ys = Float32Array.from(cyy); CT.gs = pitch;
+    CT.gnx = Math.ceil(W / pitch) + 1; CT.gny = Math.ceil(H / pitch) + 1; CT.grid = new Array(CT.gnx * CT.gny);
+    for (let id = 0; id < cx.length; id++) {
+      const g = Math.floor(cx[id] / pitch) + CT.gnx * Math.floor(cyy[id] / pitch);
+      (CT.grid[g] || (CT.grid[g] = [])).push(id);
+    }
+    const ic = NX / 2 | 0;
+    centre.moveTo(W / 2, z.dist ? yTopB[ic] : 0); centre.lineTo(W / 2, z.dist ? yBotB[ic] : H);
+    regions.chev = new Path2D();
+    if (!z.dist) regions.chev.rect(-2, -2, W + 4, H + 4);
+    else {
+      regions.chev.moveTo(-2, yTopB[0]); for (let i = 0; i < NX; i++) regions.chev.lineTo(xs(i), yTopB[i]);
+      regions.chev.lineTo(W + 2, yTopB[NX - 1]); regions.chev.lineTo(W + 2, yBotB[NX - 1]);
+      for (let i = NX - 1; i >= 0; i--) regions.chev.lineTo(xs(i), yBotB[i]);
+      regions.chev.lineTo(-2, yBotB[0]); regions.chev.closePath();
+    }
+  }
+  if (z.dist) {
+    const rd = regions.dist = new Path2D();
+    rd.moveTo(-2, -2); rd.lineTo(W + 2, -2); rd.lineTo(W + 2, yTopB[NX - 1]);
+    for (let i = NX - 1; i >= 0; i--) rd.lineTo(xs(i), yTopB[i]);
+    rd.lineTo(-2, yTopB[0]); rd.closePath();
+    rd.moveTo(-2, H + 2); rd.lineTo(W + 2, H + 2); rd.lineTo(W + 2, yBotB[NX - 1]);
+    for (let i = NX - 1; i >= 0; i--) rd.lineTo(xs(i), yBotB[i]);
+    rd.lineTo(-2, yBotB[0]); rd.closePath();
+    // the boundary between the distribution band and the heat transfer area
+    for (const arr of [yTopB, yBotB]) { lattice.moveTo(0, arr[0]); for (let i = 0; i < NX; i++) lattice.lineTo(xs(i), arr[i]); lattice.lineTo(W, arr[NX - 1]); }
+    for (const key of ['in', 'out']) {
+      const pt = state.ports[key], sgn = key === 'in' ? 1 : -1;
+      for (let a = -12; a <= 192; a += 10) {
+        const th = a / DEG; lattice.moveTo(pt.cx, pt.cy); lattice.lineTo(pt.cx + 320 * Math.cos(th), pt.cy + sgn * 320 * Math.sin(th));
+      }
+      for (let r = pt.size / 2 + 8; r < 260; r += 9) { lattice.moveTo(pt.cx + r, pt.cy); lattice.arc(pt.cx, pt.cy, r, 0, 2 * Math.PI); }
+    }
+  }
+  // clip regions with the ports cut out
+  for (const k of ['chev', 'dist']) {
+    if (!regions[k]) continue;
+    const cp = new Path2D(); cp.addPath(regions[k]); cp.addPath(G.portPath.in); cp.addPath(G.portPath.out); regions[k] = cp;
+  }
+  if (!(z.chev && chevBot > chevTop)) { CT.xs = new Float32Array(0); CT.ys = new Float32Array(0); CT.grid = []; }
+  G.pattern = { ribs, ribsB, contacts, lattice, centre, regions, chevTop, chevBot }; VER.pattern++;
+}
+function drawPattern(ctx, view) {
+  const P = G.pattern; if (!P || !state.zones.show) return;
+  const px1 = 1 / view.s, off = 0.9 * px1;
+  const pass = (path, region, w) => {
+    if (!region) return;
+    ctx.save(); ctx.clip(region, 'evenodd');
+    ctx.lineWidth = w * px1;
+    ctx.strokeStyle = theme.ribHi; ctx.save(); ctx.translate(off, off); ctx.stroke(path); ctx.restore();
+    ctx.strokeStyle = theme.rib; ctx.stroke(path);
+    ctx.restore();
+  };
+  pass(P.ribs, P.regions.chev, view.isPlate ? 1.1 : 1.5);
+  if (P.regions.chev) {
+    // the plate behind, seen through the gap: lighter and dashed; the contact points where the two touch
+    ctx.save(); ctx.clip(P.regions.chev, 'evenodd');
+    ctx.setLineDash([2.2 * px1 * (view.isPlate ? 1 : 1.5), 2.2 * px1 * (view.isPlate ? 1 : 1.5)]);
+    ctx.globalAlpha = 0.6; ctx.lineWidth = (view.isPlate ? 0.9 : 1.2) * px1; ctx.strokeStyle = theme.rib; ctx.stroke(P.ribsB);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.fillStyle = theme.contact; ctx.fill(P.contacts);
+    ctx.restore();
+  }
+  pass(P.centre, P.regions.chev, view.isPlate ? 1.4 : 2);
+  pass(P.lattice, P.regions.dist, view.isPlate ? 0.9 : 1.3);
+}
+
+/* ================= colour ================= */
+const RAMPS = {
+  light: {
+    speed:    ['#f3f7fc', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'],
+    pressure: ['#f4f2fc', '#dcd7f6', '#b9b0ee', '#9085e9', '#6250d6', '#4a3aa7', '#33287a'],
+    vort:     ['#184f95', '#3987e5', '#9ec5f4', '#f0efec', '#f2a9a8', '#e34948', '#a32c2b'],
+    temp:     ['#184f95', '#3987e5', '#9ec5f4', '#f0efec', '#f2a9a8', '#e34948', '#a32c2b'],
+    htc:      ['#effaf5', '#c8eedd', '#8fdcbc', '#4cc196', '#1baf7a', '#138a5f', '#0b5e40'],
+    age:      ['#fdf3ee', '#f9d5c2', '#f3a982', '#eb6834', '#c4501f', '#8f3713', '#5c230b'],
+    turb:     ['#fcf1f5', '#f7d2e0', '#efa6c3', '#e87ba4', '#d55181', '#a83a62', '#702542']
+  },
+  dark: {
+    speed:    ['#111a24', '#104281', '#1c5cab', '#2a78d6', '#5598e7', '#86b6ef', '#cde2fb'],
+    pressure: ['#16142a', '#2d2669', '#4a3aa7', '#6250d6', '#9085e9', '#b9b0ee', '#e3dffa'],
+    vort:     ['#86b6ef', '#3987e5', '#1c5cab', '#383835', '#a83a39', '#e66767', '#f2a9a8'],
+    temp:     ['#86b6ef', '#3987e5', '#1c5cab', '#383835', '#a83a39', '#e66767', '#f2a9a8'],
+    htc:      ['#0f1c17', '#0b5e40', '#138a5f', '#199e70', '#4cc196', '#8fdcbc', '#d3f3e5'],
+    age:      ['#1d1410', '#5c230b', '#8f3713', '#d95926', '#eb6834', '#f3a982', '#fbe0d2'],
+    turb:     ['#1d1016', '#5a1f36', '#8f2f55', '#d55181', '#e87ba4', '#f2b3cb', '#fbe3ec']
+  }
+};
+const hexRgb = hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)];
+function buildLUT(stops) {
+  const rgb = stops.map(hexRgb), lt = new Uint8ClampedArray(256 * 3), lum = new Float32Array(256);
+  const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  for (let i = 0; i < 256; i++) {
+    const pos = i / 255 * (rgb.length - 1), k = Math.min(rgb.length - 2, Math.floor(pos)), f = pos - k;
+    for (let ch = 0; ch < 3; ch++) lt[i * 3 + ch] = rgb[k][ch] + (rgb[k + 1][ch] - rgb[k][ch]) * f;
+    lum[i] = 0.2126 * lin(lt[i * 3]) + 0.7152 * lin(lt[i * 3 + 1]) + 0.0722 * lin(lt[i * 3 + 2]);
+  }
+  return { lut: lt, lum, stops };
+}
+let theme = {}, LUTS = {};
+function isDark() {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'dark') return true; if (t === 'light') return false;
+  return matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  theme = {
+    panel: g('--panel'), bg: g('--bg'), ink: g('--ink'), ink2: g('--ink-2'), ink3: g('--ink-3'), accent: g('--accent'),
+    steelA: g('--steel-a'), steelB: g('--steel-b'), steelEdge: g('--steel-edge'), gasket: g('--gasket'), gasketHi: g('--gasket-hi'),
+    hole: g('--hole'), handle: g('--handle'), trace: g('--trace'), line: g('--line'), rib: g('--rib'), ribHi: g('--rib-hi'), contact: g('--contact'),
+    dataFont: g('--font-data') || 'monospace', displayFont: g('--font-display') || 'sans-serif',
+    particleDark: isDark() ? 'rgba(6,12,18,0.7)' : 'rgba(12,28,42,0.62)'
+  };
+  const set = RAMPS[isDark() ? 'dark' : 'light'];
+  LUTS = {}; for (const k in set) LUTS[k] = buildLUT(set[k]); VER.theme++;
+  updateLegend(true);
+}
+
+/* ================= field → image ================= */
+const heat = document.createElement('canvas'); heat.width = NX; heat.height = NY;
+const hctx = heat.getContext('2d'); const img = hctx.createImageData(NX, NY);
+const disp = { vmax: 0.5, pmin: 0, pmax: 100, wmax: 50, umax: 3000, tmax: 0.3, init: false };
+
+function computeVel() {
+  for (let n = 0; n < fluidList.length; n++) {
+    const c = fluidList[n], iu = cellIU[n];
+    const a = 0.5 * (u[iu] + u[iu + 1]), b = 0.5 * (v[c] + v[c + NX]);
+    uc[c] = a; vc[c] = b; spd[c] = Math.hypot(a, b);
+  }
+}
+// colour scales follow robust percentiles of a cell sample, eased slowly, so single fast cells can't make the field pulse
+const SAMPLE = new Float32Array(4096);
+function percentile(get, q) {
+  let n = 0;
+  const stride = Math.max(1, Math.floor(fluidList.length / 4000));
+  for (let k = 0; k < fluidList.length && n < SAMPLE.length; k += stride) {
+    const c = fluidList[k]; if (portIn[c] || portOut[c]) continue; SAMPLE[n++] = get(c);
+  }
+  if (!n) return 0;
+  const a = SAMPLE.subarray(0, n).sort();
+  return a[Math.min(n - 1, Math.floor(q * (n - 1)))];
+}
+function colorize() {
+  const mode = state.view.mode;
+  if (mode === 'vort') {
+    for (let n = 0; n < fluidList.length; n++) {
+      const c = fluidList[n], f = flags[c];
+      const vr = (f & 2) ? vc[c + 1] : vc[c], vl = (f & 1) ? vc[c - 1] : vc[c];
+      const ud = (f & 8) ? uc[c + NX] : uc[c], uu = (f & 4) ? uc[c - NX] : uc[c];
+      // y points down on screen; flip so anticlockwise swirl is positive
+      vortF[c] = -((vr - vl) / (2 * DX) - (ud - uu) / (2 * DX));
+    }
+  }
+  const first = !disp.init; disp.init = true;
+  const ease = (key, target, k) => { disp[key] = first ? target : disp[key] + (target - disp[key]) * k; };
+  ease('vmax', Math.max(percentile(c => spd[c], 0.98) * 1.08, 1e-3), 0.04);
+  if (mode === 'htc' || first) ease('umax', Math.max(percentile(c => Uloc[c], 0.98) * 1.05, 1), 0.04);
+  if (mode === 'pressure' || first) {
+    const lo = percentile(c => p[c], 0.005), hi = percentile(c => p[c], 0.995);
+    ease('pmin', lo, 0.04); ease('pmax', Math.max(hi, lo + 1e-3), 0.04);
+  }
+  if (mode === 'vort') ease('wmax', Math.max(percentile(c => Math.abs(vortF[c]), 0.95), 1), 0.04);
+  if (mode === 'turb' || first) ease('tmax', Math.max(percentile(c => turbI[c], 0.98) * 1.05, 0.02), 0.04);
+
+  const tau = tauNominal(), data = img.data, L = LUTS[mode].lut;
+  const pr = disp.pmax - disp.pmin || 1, Tin = state.params.Tin, Tc = state.params.Tc;
+  const tlo = Math.min(Tin, Tc), tr = Math.abs(Tin - Tc) || 1;
+  for (let c = 0; c < NC; c++) {
+    if (!fluid[c]) { tCell[c] = -1; continue; }
+    let t;
+    if (mode === 'speed') t = spd[c] / disp.vmax;
+    else if (mode === 'pressure') t = (p[c] - disp.pmin) / pr;
+    else if (mode === 'vort') t = 0.5 + vortF[c] / (2 * disp.wmax);
+    else if (mode === 'temp') t = (T[c] - tlo) / tr;
+    else if (mode === 'htc') t = Uloc[c] / disp.umax;
+    else if (mode === 'turb') t = turbI[c] / disp.tmax;
+    else t = isFinite(tau) ? age[c] / (3 * tau) : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t; tCell[c] = t;
+    const k = (t * 255) | 0, o = c * 4;
+    data[o] = L[k * 3]; data[o + 1] = L[k * 3 + 1]; data[o + 2] = L[k * 3 + 2]; data[o + 3] = 255;
+  }
+  // bleed edge colours into solid cells so smoothing doesn't darken the walls
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const c = i + NX * j; if (fluid[c]) continue;
+    let found = -1;
+    if (i > 0 && fluid[c - 1]) found = c - 1; else if (i < NX - 1 && fluid[c + 1]) found = c + 1;
+    else if (j > 0 && fluid[c - NX]) found = c - NX; else if (j < NY - 1 && fluid[c + NX]) found = c + NX;
+    const o = c * 4;
+    if (found >= 0) { const s = found * 4; data[o] = data[s]; data[o + 1] = data[s + 1]; data[o + 2] = data[s + 2]; data[o + 3] = 255; }
+    else data[o + 3] = 0;
+  }
+  hctx.putImageData(img, 0, 0);
+}
+
+/* ================= views ================= */
+function makeView(canvasId, wrapId, isPlate) {
+  const canvas = document.getElementById(canvasId);
+  const view = { canvas, ctx: canvas.getContext('2d'), wrap: document.getElementById(wrapId), isPlate, cssW: 1, cssH: 1, dpr: 1, s: 1, ox: 0, oy: 0, region: PLATE_REGION, hoverHit: null, layers: {} };
+  new ResizeObserver(() => sizeView(view)).observe(view.wrap);
+  sizeView(view);
+  return view;
+}
+function sizeView(view) {
+  const r = view.wrap.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = Math.max(50, Math.round(r.width)), cssH = Math.max(50, Math.round(r.height));
+  const bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr);
+  // resizing a canvas wipes it, so only do it when the size really changed, and repaint straight away
+  if (bw === view.canvas.width && bh === view.canvas.height && dpr === view.dpr) return;
+  view.cssW = cssW; view.cssH = cssH; view.dpr = dpr;
+  view.canvas.width = bw; view.canvas.height = bh;
+  if (view.ready) repaint(view);
+}
+function repaint(view) {
+  fitView(view);
+  if (view === detail) { detail.region = detailRegion(); fitView(detail); }
+  drawView(view);
+}
+function fitView(view) {
+  const Rg = view.region, s = Math.min(view.cssW / Rg.w, view.cssH / Rg.h);
+  view.s = s; view.ox = (view.cssW - Rg.w * s) / 2 - Rg.x0 * s; view.oy = (view.cssH - Rg.h * s) / 2 - Rg.y0 * s;
+}
+let detailFrozen = null;
+function detailRegion() {
+  const pt = state.ports[state.sel];
+  const ext = pt.size * 0.5 * Math.max(Math.sqrt(pt.aspect), 1 / Math.sqrt(pt.aspect));
+  const half = Math.max(50, ext + 28);
+  let cx = detailFrozen ? detailFrozen[0] : pt.cx, cy = detailFrozen ? detailFrozen[1] : pt.cy;
+  cx = clamp(cx, half - 8, W - half + 8); cy = clamp(cy, half - 8, H - half + 8);
+  return { x0: cx - half, y0: cy - half, w: 2 * half, h: 2 * half };
+}
+const toScreen = (view, x, y) => [view.ox + x * view.s, view.oy + y * view.s];
+const toMM = (view, X, Y) => [(X - view.ox) / view.s, (Y - view.oy) / view.s];
+
+// static layers are painted once into offscreen bitmaps and reused until geometry, theme or view changes
+const VER = { geom: 0, pattern: 0, theme: 0 };
+function layer(view, name, key, paint) {
+  let Ly = view.layers[name];
+  if (!Ly) Ly = view.layers[name] = { c: document.createElement('canvas'), key: '' };
+  const fullKey = `${key}|${view.canvas.width}x${view.canvas.height}|${view.s.toFixed(4)}|${view.ox.toFixed(2)}|${view.oy.toFixed(2)}|${VER.theme}`;
+  if (Ly.key !== fullKey) {
+    // reuse the bitmap: reallocating full-size canvases every frame stalls the browser
+    if (Ly.c.width !== view.canvas.width || Ly.c.height !== view.canvas.height) { Ly.c.width = view.canvas.width; Ly.c.height = view.canvas.height; }
+    const x = Ly.c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, Ly.c.width, Ly.c.height);
+    x.setTransform(view.dpr, 0, 0, view.dpr, 0, 0); x.translate(view.ox, view.oy); x.scale(view.s, view.s);
+    paint(x, 1 / view.s); Ly.key = fullKey;
+  }
+  view.ctx.drawImage(Ly.c, 0, 0);
+}
+function paintUnder(ctx, px1) {
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, theme.steelA); grad.addColorStop(1, theme.steelB);
+  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 6); ctx.fillStyle = grad; ctx.fill();
+  ctx.lineWidth = 1.2 * px1; ctx.strokeStyle = theme.steelEdge; ctx.stroke();
+  // sealed cold-side ports with ring gaskets
+  for (const key of ['in', 'out']) {
+    const sp2 = G.sealPath[key];
+    ctx.fillStyle = theme.hole; ctx.fill(sp2);
+    ctx.save(); const clipP = new Path2D(); clipP.rect(-60, -60, W + 120, H + 120); clipP.addPath(sp2); ctx.clip(clipP, 'evenodd');
+    ctx.strokeStyle = theme.gasket; ctx.lineWidth = GASKET_W * 2; ctx.stroke(sp2); ctx.restore();
+    ctx.lineWidth = 1.2 * px1; ctx.strokeStyle = theme.ink3; ctx.stroke(sp2);
+  }
+}
+function paintOver(ctx, px1) {
+  for (const key of ['in', 'out']) { ctx.fillStyle = theme.hole; ctx.fill(G.portPath[key]); }
+  // channel gasket, drawn on the outside of the sealing line
+  ctx.save();
+  const clipG = new Path2D(); clipG.rect(-60, -60, W + 120, H + 120); clipG.addPath(G.gasketPath);
+  ctx.clip(clipG, 'evenodd');
+  ctx.lineJoin = 'round'; ctx.strokeStyle = theme.gasket; ctx.lineWidth = GASKET_W * 2; ctx.stroke(G.gasketPath);
+  ctx.strokeStyle = theme.gasketHi; ctx.lineWidth = 1.2 * px1; ctx.stroke(G.gasketPath);
+  ctx.restore();
+  for (const key of ['in', 'out']) {
+    const selected = key === state.sel && !state.editGasket;
+    ctx.lineWidth = (selected ? 2.4 : 1.4) * px1; ctx.strokeStyle = selected ? theme.accent : theme.ink;
+    ctx.stroke(G.portPath[key]);
+  }
+}
+function drawView(view) {
+  const ctx = view.ctx, s = view.s, P = state.view;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = view.isPlate ? theme.bg : theme.panel;
+  ctx.fillRect(0, 0, view.canvas.width, view.canvas.height);
+  // while a shape is being dragged, the slow layers refresh a few times a second; the port rim and gasket stay live
+  const live = editingShape(), slowKey = live ? `d${Math.floor(frameNo / 8)}` : `g${VER.geom}.${VER.pattern}`;
+  layer(view, 'under', `u${slowKey}`, paintUnder);
+
+  ctx.save();
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  ctx.translate(view.ox, view.oy); ctx.scale(s, s);
+  const px1 = 1 / s;
+  // flow field: the gasket layer drawn later hides the soft edge, so no clip is needed
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(heat, 0, 0, W, H);
+  ctx.restore();
+  if (state.zones.show) layer(view, 'pattern', `p${slowKey}`, (x) => { x.clip(G.gasketPath); drawPattern(x, view); });
+
+  ctx.save();
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  ctx.translate(view.ox, view.oy); ctx.scale(s, s);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (P.streams && G.streams.length) {
+    ctx.strokeStyle = theme.trace; ctx.lineWidth = (view.isPlate ? 1 : 1.3) * px1;
+    ctx.beginPath();
+    for (const ln of G.streams) { ctx.moveTo(ln[0][0], ln[0][1]); for (let i = 1; i < ln.length; i++) ctx.lineTo(ln[i][0], ln[i][1]); }
+    ctx.stroke();
+  }
+  if (P.arrows) drawArrows(ctx, view);
+  if (P.particles) drawParticles(ctx, view);
+  ctx.restore();
+
+  layer(view, 'over', `o${VER.geom}.${state.sel}.${state.editGasket}`, paintOver);
+
+  ctx.save();
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  ctx.translate(view.ox, view.oy); ctx.scale(s, s);
+  // section A–A
+  ctx.save(); ctx.setLineDash([5 * px1, 4 * px1]); ctx.lineWidth = 1.2 * px1; ctx.strokeStyle = theme.ink;
+  ctx.beginPath(); ctx.moveTo(view.isPlate ? -8 : 0, state.sectionY); ctx.lineTo(W + (view.isPlate ? 3 : 0), state.sectionY); ctx.stroke(); ctx.restore();
+  if (view.isPlate) {
+    const Rg = detail.region; ctx.save(); ctx.setLineDash([3 * px1, 3 * px1]); ctx.lineWidth = 1.2 * px1; ctx.strokeStyle = theme.accent;
+    ctx.strokeRect(Math.max(Rg.x0, -4), Math.max(Rg.y0, -4), Math.min(Rg.w, W + 8), Math.min(Rg.h, H + 8)); ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  // ---- screen-space overlays ----
+  ctx.save();
+  if (!view.isPlate) { ctx.beginPath(); ctx.rect(0, 0, view.cssW, view.cssH); ctx.clip(); }
+  // port symbols: ⊙ flow out of the page toward the viewer, ⊗ flow into the page
+  const sym = (X, Y, r, out, col, label) => {
+    ctx.fillStyle = theme.panel; ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(X, Y, r, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    if (!out) { ctx.arc(X, Y, r * 0.28, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill(); }
+    else { const d = r * 0.55; ctx.moveTo(X - d, Y - d); ctx.lineTo(X + d, Y + d); ctx.moveTo(X + d, Y - d); ctx.lineTo(X - d, Y + d); ctx.stroke(); }
+    ctx.font = `600 ${view.isPlate ? 11 : 12.5}px ${theme.displayFont}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = theme.panel; ctx.globalAlpha = 0.88; ctx.fillRect(X + r + 3, Y - 7, tw + 6, 14); ctx.globalAlpha = 1;
+    ctx.fillStyle = theme.ink; ctx.fillText(label, X + r + 6, Y + 0.5);
+  };
+  for (const key of ['in', 'out']) {
+    const pt = state.ports[key], [X, Y] = toScreen(view, pt.cx, pt.cy);
+    sym(X, Y, view.isPlate ? 7 : 9, key === 'out', key === state.sel && !state.editGasket ? theme.accent : theme.ink, key === 'in' ? 'HOT IN' : 'HOT OUT');
+    const [Xs, Ys] = toScreen(view, W - pt.cx, pt.cy);
+    sym(Xs, Ys, view.isPlate ? 6 : 8, key === 'in', theme.ink3, key === 'in' ? 'COLD OUT' : 'COLD IN');
+  }
+  const hr = view.isPlate ? 3.6 : 5;
+  if (state.editGasket) {
+    state.gasket.forEach((q, k) => drawHandle(ctx, ...toScreen(view, q[0], q[1]), hr, view.hoverHit && view.hoverHit.type === 'gasket' && view.hoverHit.k === k));
+  } else {
+    portCtrl(state.ports[state.sel]).forEach((q, k) => drawHandle(ctx, ...toScreen(view, q[0], q[1]), hr, view.hoverHit && view.hoverHit.type === 'pctrl' && view.hoverHit.k === k));
+  }
+  if (view.isPlate) drawPlateAnnotations(ctx, view);
+  else {
+    ctx.font = `500 11px ${theme.dataFont}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    const zoom = view.s / plate.s, lbl = `${zoom.toFixed(1)}× · grid 2 mm`, tw = ctx.measureText(lbl).width;
+    ctx.fillStyle = theme.panel; ctx.globalAlpha = 0.88; ctx.fillRect(view.cssW - tw - 14, view.cssH - 22, tw + 10, 18); ctx.globalAlpha = 1;
+    ctx.fillStyle = theme.ink2; ctx.fillText(lbl, view.cssW - 9, view.cssH - 8);
+  }
+  ctx.restore();
+}
+function drawHandle(ctx, X, Y, r, hot) {
+  ctx.beginPath(); ctx.arc(X, Y, hot ? r + 1.8 : r, 0, 2 * Math.PI);
+  ctx.fillStyle = theme.handle; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = theme.accent; ctx.stroke();
+}
+function pill(ctx, text, X, Y, align) {
+  const tw = ctx.measureText(text).width, x0 = align === 'right' ? X - tw - 8 : X;
+  ctx.fillStyle = theme.panel; ctx.globalAlpha = 0.86; ctx.fillRect(x0, Y - 8, tw + 8, 16); ctx.globalAlpha = 1;
+  ctx.fillStyle = theme.ink2; ctx.textAlign = 'left'; ctx.fillText(text, x0 + 4, Y + 0.5);
+}
+function drawPlateAnnotations(ctx, view) {
+  ctx.strokeStyle = theme.ink3; ctx.fillStyle = theme.ink2; ctx.lineWidth = 1;
+  ctx.font = `400 11px ${theme.dataFont}`;
+  const [x0, yb] = toScreen(view, 0, H + 13), [x1] = toScreen(view, W, 0);
+  ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(x1, yb);
+  ctx.moveTo(x0, yb - 4); ctx.lineTo(x0, yb + 4); ctx.moveTo(x1, yb - 4); ctx.lineTo(x1, yb + 4); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const wl = `${W} mm`, ww = ctx.measureText(wl).width;
+  ctx.fillStyle = theme.bg; ctx.fillRect((x0 + x1) / 2 - ww / 2 - 4, yb - 7, ww + 8, 14);
+  ctx.fillStyle = theme.ink2; ctx.fillText(wl, (x0 + x1) / 2, yb);
+  const [xl, y0] = toScreen(view, -18, 0), [, y1] = toScreen(view, 0, H);
+  ctx.beginPath(); ctx.moveTo(xl, y0); ctx.lineTo(xl, y1);
+  ctx.moveTo(xl - 4, y0); ctx.lineTo(xl + 4, y0); ctx.moveTo(xl - 4, y1); ctx.lineTo(xl + 4, y1); ctx.stroke();
+  ctx.save(); ctx.translate(xl, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+  const hl = `${H} mm`, hw = ctx.measureText(hl).width;
+  ctx.fillStyle = theme.bg; ctx.fillRect(-hw / 2 - 4, -7, hw + 8, 14); ctx.fillStyle = theme.ink2; ctx.fillText(hl, 0, 0); ctx.restore();
+  // zone labels
+  if (state.zones.show) {
+    ctx.font = `600 10.5px ${theme.displayFont}`; ctx.textBaseline = 'middle';
+    const z = state.zones, xs = toScreen(view, 24, 0)[0];
+    if (z.dist) {
+      pill(ctx, 'DISTRIBUTION', toScreen(view, 98, 0)[0], toScreen(view, 0, z.distLen - 8)[1]);
+      pill(ctx, 'DISTRIBUTION', toScreen(view, 98, 0)[0], toScreen(view, 0, H - z.distLen + 8)[1]);
+    }
+    if (z.chev) pill(ctx, `CHEVRON ${z.phi}°`, xs, toScreen(view, 0, (z.dist ? yTopB[12] : 140) + 12)[1]);
+  }
+  // chevron angle handle
+  const A = phiGizmo();
+  if (A) {
+    const [ax, ay] = toScreen(view, A.ax, A.ay), [hx, hy] = toScreen(view, A.hx, A.hy), r = A.r * view.s, ph = state.zones.phi / DEG;
+    ctx.save();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = theme.ink; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(ax, ay + 6); ctx.lineTo(ax, ay - r); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(ax, ay, r * 0.42, -Math.PI / 2, -Math.PI / 2 + ph); ctx.stroke();
+    const mid = -Math.PI / 2 + ph / 2, lx = ax + Math.cos(mid) * r * 0.42 + 6, ly = ay + Math.sin(mid) * r * 0.42 - 2;
+    ctx.font = `600 11px ${theme.displayFont}`; ctx.textBaseline = 'middle';
+    pill(ctx, `φ ${state.zones.phi}°`, lx, ly - 8);
+    drawHandle(ctx, hx, hy, plate.hoverHit && plate.hoverHit.type === 'phi' ? 6 : 5, false);
+    ctx.restore();
+  }
+  // section labels
+  const [ax, ay] = toScreen(view, -9, state.sectionY), [bx] = toScreen(view, W + 4, 0);
+  ctx.font = `700 12px ${theme.displayFont}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.beginPath(); ctx.arc(ax - 4, ay, 8, 0, 2 * Math.PI); ctx.fillStyle = theme.ink; ctx.fill();
+  ctx.fillStyle = theme.bg; ctx.fillText('A', ax - 4, ay + 0.5);
+  ctx.fillStyle = theme.ink; ctx.textAlign = 'left'; ctx.fillText('A', bx, ay + 0.5);
+  const Rg = detail.region, [dx, dy] = toScreen(view, Math.max(Rg.x0, -4), Math.max(Rg.y0, -4));
+  ctx.font = `600 10.5px ${theme.displayFont}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillStyle = theme.accent; ctx.fillText('DETAIL', dx + 2, dy - 2);
+}
+function drawParticles(ctx, view) {
+  const lum = LUTS[state.view.mode].lum, lightPath = new Path2D(), darkPath = new Path2D();
+  for (let k = 0; k < NPART; k++) {
+    const x = px[k] * CELL, y = py[k] * CELL;
+    let dx = (px[k] - ppx[k]) * CELL * 2.2, dy = (py[k] - ppy[k]) * CELL * 2.2;
+    const m = Math.hypot(dx, dy); if (m > 14) { dx *= 14 / m; dy *= 14 / m; }
+    const t = tCell[(px[k] | 0) + NX * (py[k] | 0)];
+    const path = t >= 0 && lum[(t * 255) | 0] < 0.33 ? lightPath : darkPath;
+    path.moveTo(x - dx, y - dy); path.lineTo(x + 0.01, y);
+  }
+  ctx.lineWidth = (view.isPlate ? 1.5 : 2) / view.s;
+  ctx.strokeStyle = 'rgba(255,255,255,0.82)'; ctx.stroke(lightPath);
+  ctx.strokeStyle = theme.particleDark; ctx.stroke(darkPath);
+}
+function drawArrows(ctx, view) {
+  const stepC = view.isPlate ? 6 : 3, L = stepC * CELL * 0.9;
+  ctx.strokeStyle = theme.trace; ctx.lineWidth = 1.2 / view.s; ctx.beginPath();
+  for (let j = stepC >> 1; j < NY; j += stepC) for (let i = stepC >> 1; i < NX; i += stepC) {
+    const c = i + NX * j; if (!fluid[c] || portIn[c] || portOut[c]) continue;
+    const m = spd[c] / disp.vmax; if (m < 0.03) continue;
+    const ux = uc[c] / spd[c], uy = vc[c] / spd[c], len = L * Math.min(1, m);
+    const x = (i + 0.5) * CELL, y = (j + 0.5) * CELL, ex = x + ux * len, ey = y + uy * len, hs = Math.min(len * 0.4, 3);
+    ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+    ctx.moveTo(ex - ux * hs - uy * hs * 0.6, ey - uy * hs + ux * hs * 0.6); ctx.lineTo(ex, ey);
+    ctx.lineTo(ex - ux * hs + uy * hs * 0.6, ey - uy * hs - ux * hs * 0.6);
+  }
+  ctx.stroke();
+}
+
+/* ================= interaction ================= */
+let drag = null;
+const editingShape = () => !!drag && (drag.hit.type === 'pctrl' || drag.hit.type === 'pmove' || drag.hit.type === 'gasket');
+function hitTest(view, X, Y, touch) {
+  const tol = touch ? 16 : 9;
+  const near = q => { const [sx, sy] = toScreen(view, q[0], q[1]); return Math.hypot(sx - X, sy - Y); };
+  let best = null, bd = tol;
+  if (state.editGasket) state.gasket.forEach((q, k) => { const d = near(q); if (d < bd) { bd = d; best = { type: 'gasket', k }; } });
+  else portCtrl(state.ports[state.sel]).forEach((q, k) => { const d = near(q); if (d < bd) { bd = d; best = { type: 'pctrl', k }; } });
+  if (best) return best;
+  const order = [state.sel, state.sel === 'in' ? 'out' : 'in'];
+  for (const key of order) { const pt = state.ports[key]; if (near([pt.cx, pt.cy]) < tol + 5) return { type: 'pmove', key }; }
+  const [mx, my] = toMM(view, X, Y);
+  for (const key of order) if (pointInPoly(mx, my, key === 'in' ? G.inPoly : G.outPoly)) return { type: 'pmove', key };
+  if (view.isPlate) {
+    const A = phiGizmo();
+    if (A && Math.hypot(...toScreen(view, A.hx, A.hy).map((q, i) => q - (i ? Y : X))) < tol + 2) return { type: 'phi' };
+  }
+  const [, sy] = toScreen(view, 0, state.sectionY);
+  if (Math.abs(sy - Y) < tol * 0.8 && mx > -16 && mx < W + 10) return { type: 'section' };
+  return null;
+}
+const cursorFor = hit => !hit ? 'default' : hit.type === 'section' ? 'ns-resize' : hit.type === 'pmove' ? 'move' : 'grab';
+// on-plate chevron angle handle: apex on the centre line, handle along a rib
+function phiGizmo() {
+  const z = state.zones; if (!z.chev || !z.show || state.editGasket) return null;
+  const ic = NX / 2 | 0, top = z.dist ? yTopB[ic] : 0, bot = z.dist ? yBotB[ic] : H;
+  if (bot - top < 90) return null;
+  const ax = W / 2, ay = top + 64, r = 44, ph = z.phi / DEG;
+  return { ax, ay, r, hx: ax + r * Math.sin(ph), hy: ay - r * Math.cos(ph) };
+}
+function setPhi(a) {
+  state.zones.phi = a; $('rPhi').value = a; $('oPhi').textContent = phiLabel(a); setSeg('segPhi', String(a)); buildPattern();
+}
+function bindView(view) {
+  const cv = view.canvas;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => {
+    const [X, Y] = pos(e), hit = hitTest(view, X, Y, e.pointerType === 'touch');
+    if (!hit) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId); cv.focus({ preventScroll: true });
+    const m = toMM(view, X, Y);
+    if (hit.type === 'pmove') {
+      if (hit.key !== state.sel) selectPort(hit.key);
+      const pt = state.ports[hit.key]; hit.off = [m[0] - pt.cx, m[1] - pt.cy];
+    }
+    if (!view.isPlate) detailFrozen = [detail.region.x0 + detail.region.w / 2, detail.region.y0 + detail.region.h / 2];
+    drag = { view, hit }; cv.style.cursor = hit.type === 'pctrl' || hit.type === 'gasket' ? 'grabbing' : cursorFor(hit);
+  });
+  cv.addEventListener('pointermove', e => {
+    const [X, Y] = pos(e), m = toMM(view, X, Y);
+    if (drag && drag.view === view) {
+      const hh = drag.hit;
+      if (hh.type === 'pmove') {
+        const pt = state.ports[hh.key]; pt.cx = clamp(m[0] - hh.off[0], 4, W - 4); pt.cy = clamp(m[1] - hh.off[1], 4, H - 4);
+      } else if (hh.type === 'pctrl') {
+        const pt = state.ports[state.sel]; pt.base[hh.k] = mmToBase(pt, [clamp(m[0], -4, W + 4), clamp(m[1], -4, H + 4)]);
+        if (pt.preset !== 'custom') { pt.preset = 'custom'; syncPortUI(); }
+      } else if (hh.type === 'gasket') {
+        const n = state.gasket.length, ga = state.gasket[(hh.k - 1 + n) % n], gb = state.gasket[(hh.k + 1) % n];
+        let gx = clamp(m[0], 3, W - 3);
+        // snap to a neighbour's x so the side seal stays straight
+        if (Math.abs(gx - ga[0]) < 2.5) gx = ga[0]; else if (Math.abs(gx - gb[0]) < 2.5) gx = gb[0];
+        state.gasket[hh.k] = [gx, clamp(m[1], 3, H - 3)];
+      } else if (hh.type === 'section') {
+        state.sectionY = clamp(m[1], 8, H - 8); chartDirty = true;
+      }
+      else if (hh.type === 'phi') {
+        const A = phiGizmo(); if (A) setPhi(clamp(Math.round(Math.atan2(Math.abs(m[0] - A.ax), Math.max(A.ay - m[1], 0.01)) * DEG), 10, 80));
+      }
+      if (hh.type !== 'section' && hh.type !== 'phi') geomDirty = true;
+    } else {
+      view.hoverHit = hitTest(view, X, Y, e.pointerType === 'touch');
+      cv.style.cursor = cursorFor(view.hoverHit);
+    }
+    probeAt(m);
+  });
+  const end = () => { if (drag && drag.view === view) { drag = null; detailFrozen = null; cv.style.cursor = 'default'; } };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('pointerleave', () => { view.hoverHit = null; if (!drag) probeEl.textContent = 'Hover over the plate to probe the flow'; });
+  cv.addEventListener('keydown', e => {
+    const d = e.shiftKey ? 5 : 1, pt = state.ports[state.sel];
+    const mv = { ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, -d], ArrowDown: [0, d] }[e.key];
+    if (!mv) return; e.preventDefault();
+    pt.cx = clamp(pt.cx + mv[0], 4, W - 4); pt.cy = clamp(pt.cy + mv[1], 4, H - 4); geomDirty = true;
+  });
+}
+const probeEl = document.getElementById('probe');
+const ZONE_NAME = ['flat', 'distribution', 'chevron', 'distribution'];
+function outletPressure() { return outCells.length ? outCells.reduce((s, q) => s + p[q], 0) / outCells.length : 0; }
+function probeAt(m) {
+  const [x, y] = m;
+  if (x < 0 || y < 0 || x >= W || y >= H) { probeEl.textContent = 'Hover over the plate to probe the flow'; return; }
+  const c = Math.floor(x / CELL) + NX * Math.floor(y / CELL);
+  const where = `x ${x.toFixed(0)} · y ${y.toFixed(0)} mm`;
+  if (!fluid[c]) { probeEl.textContent = `${where} · sealed, outside the gasket`; return; }
+  const zone = portIn[c] ? 'inlet port' : portOut[c] ? 'outlet port' : ZONE_NAME[zoneC[c]];
+  probeEl.textContent = `${where} · ${zone} · ${spd[c].toFixed(2)} m/s · ${fmtP(p[c] - outletPressure())} · ${T[c].toFixed(1)} °C${Uloc[c] ? ' · U ' + Uloc[c].toFixed(0) + ' W/m²K' : ''}${turbI[c] > 0.005 ? ' · turbulence ' + (100 * turbI[c]).toFixed(0) + '%' : ''}`;
+}
+function fmtP(pa) { return Math.abs(pa) >= 1000 ? `${(pa / 1000).toFixed(2)} kPa` : `${pa.toFixed(0)} Pa`; }
+
+/* ================= UI wiring ================= */
+const $ = id => document.getElementById(id);
+function setSeg(segId, val) { $(segId).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === val))); }
+function bindSeg(segId, fn) { $(segId).addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setSeg(segId, b.dataset.v); fn(b.dataset.v); } }); }
+
+function presetIcon(id) {
+  const pts = catmullRomClosed(makeBase(id, false), 8);
+  let mx = 0; pts.forEach(q => mx = Math.max(mx, Math.abs(q[0]), Math.abs(q[1])));
+  const k = 11 / mx;
+  return `<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="${pts.map((q, i) => (i ? 'L' : 'M') + (q[0] * k).toFixed(2) + ' ' + (q[1] * k).toFixed(2)).join(' ')}Z"/></svg>`;
+}
+$('presets').innerHTML = PRESETS.map(pr => `<button type="button" data-id="${pr.id}" aria-pressed="false">${presetIcon(pr.id)}<span>${pr.label}</span></button>`).join('');
+$('presets').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const pt = state.ports[state.sel]; pt.preset = b.dataset.id; pt.base = makeBase(pt.preset, state.sel === 'out');
+  syncPortUI(); geomDirty = true;
+});
+function selectPort(key) { state.sel = key; setSeg('segPort', key); syncPortUI(); }
+function syncPortUI() {
+  const pt = state.ports[state.sel];
+  $('rSize').value = pt.size; $('oSize').textContent = `${pt.size.toFixed(0)} mm`;
+  $('rAspect').value = pt.aspect; $('oAspect').textContent = pt.aspect.toFixed(2);
+  $('rRot').value = pt.rot; $('oRot').textContent = `${pt.rot.toFixed(0)}°`;
+  $('presets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === pt.preset)));
+  $('customNote').textContent = pt.preset === 'custom' ? 'Custom shape: the sliders scale and turn your edited outline.' : '';
+  $('detailLabel').textContent = state.sel === 'in' ? 'Inlet port' : 'Outlet port';
+  $('btnCopyPort').textContent = state.sel === 'in' ? 'Copy to outlet port' : 'Copy to inlet port';
+}
+function syncPortStats() {
+  const key = state.sel, A = key === 'in' ? G.areaIn : G.areaOut, poly = key === 'in' ? G.inPoly : G.outPoly;
+  $('psD').textContent = `${Math.sqrt(4 * A / Math.PI).toFixed(1)} mm`;
+  $('psA').textContent = `${(A / 100).toFixed(1)} cm²`;
+  $('psP').textContent = `${polyPerimeter(poly).toFixed(0)} mm`;
+  const c = G.clearance[key];
+  $('psC').textContent = c < 0 ? 'crosses gasket' : `${c.toFixed(1)} mm`;
+}
+bindSeg('segPort', val => selectPort(val));
+$('rSize').addEventListener('input', e => { const pt = state.ports[state.sel]; pt.size = +e.target.value; $('oSize').textContent = `${pt.size} mm`; geomDirty = true; });
+$('rAspect').addEventListener('input', e => { const pt = state.ports[state.sel]; pt.aspect = +e.target.value; $('oAspect').textContent = pt.aspect.toFixed(2); geomDirty = true; });
+$('rRot').addEventListener('input', e => { const pt = state.ports[state.sel]; pt.rot = +e.target.value; $('oRot').textContent = `${pt.rot}°`; geomDirty = true; });
+$('btnResetPort').addEventListener('click', () => { state.ports[state.sel] = newPort(state.sel); syncPortUI(); geomDirty = true; });
+$('btnCopyPort').addEventListener('click', () => {
+  const src = state.ports[state.sel], key = state.sel === 'in' ? 'out' : 'in', dst = state.ports[key];
+  dst.base = src.base.map(([x, y]) => [x, -y]); dst.size = src.size; dst.aspect = src.aspect; dst.rot = -src.rot; dst.preset = src.preset;
+  geomDirty = true;
+});
+
+const phiLabel = a => `${a}° · ${a < 40 ? 'soft' : a < 52 ? 'mixed' : 'hard'}`;
+function syncPatternUI() {
+  const z = state.zones;
+  $('rDist').disabled = !z.dist; $('slDist').classList.toggle('off', !z.dist);
+  $('rPhi').disabled = !z.chev; $('slPhi').classList.toggle('off', !z.chev);
+  $('segPhi').querySelectorAll('button').forEach(b => b.disabled = !z.chev);
+}
+$('chkDist').addEventListener('change', e => { state.zones.dist = e.target.checked; syncPatternUI(); geomDirty = true; });
+$('chkChev').addEventListener('change', e => { state.zones.chev = e.target.checked; syncPatternUI(); geomDirty = true; });
+$('rDist').addEventListener('input', e => { state.zones.distLen = +e.target.value; $('oDist').textContent = `${e.target.value} mm`; geomDirty = true; });
+$('rPhi').addEventListener('input', e => setPhi(+e.target.value));
+bindSeg('segPhi', val => setPhi(+val));
+$('chkPattern').addEventListener('change', e => { state.zones.show = e.target.checked; });
+
+bindSeg('segHold', val => {
+  const P = state.params;
+  if (val === 'flow') { P.qLmin = clamp(Math.round(G.Q * 60000 * 10) / 10, 0.2, 20); $('rQ').value = P.qLmin; $('oQ').textContent = `${P.qLmin.toFixed(1)} L/min`; }
+  else { P.vPort = clamp(Math.round(G.vPortEff * 20) / 20, 0.2, 3); $('rV').value = P.vPort; $('oV').textContent = `${P.vPort.toFixed(2)} m/s`; }
+  P.hold = val; $('slV').hidden = val !== 'speed'; $('slQ').hidden = val !== 'flow'; updateSources();
+});
+$('rV').addEventListener('input', e => { state.params.vPort = +e.target.value; $('oV').textContent = `${state.params.vPort.toFixed(2)} m/s`; updateSources(); });
+$('rQ').addEventListener('input', e => { state.params.qLmin = +e.target.value; $('oQ').textContent = `${state.params.qLmin.toFixed(1)} L/min`; updateSources(); });
+$('rN').addEventListener('input', e => { state.params.nCh = +e.target.value; $('oN').textContent = e.target.value; updateSources(); });
+$('rGap').addEventListener('input', e => { state.params.gap = +e.target.value; $('oGap').textContent = `${state.params.gap.toFixed(1)} mm`; $('specGap').textContent = state.params.gap.toFixed(1); updateSources(); drawXsec(); buildPattern(); });
+$('rTin').addEventListener('input', e => { state.params.Tin = +e.target.value; $('oTin').textContent = `${e.target.value} °C`; $('specTin').textContent = e.target.value; updateSources(); updateLegend(true); });
+$('rTc').addEventListener('input', e => { state.params.Tc = +e.target.value; $('oTc').textContent = `${e.target.value} °C`; $('specTc').textContent = e.target.value; updateSources(); updateLegend(true); });
+$('nT').addEventListener('input', e => { const t = parseFloat(e.target.value); if (t >= 0.3 && t <= 1.2) { state.params.thick = t; $('specT').textContent = t.toFixed(2); drawXsec(); } });
+
+$('chkGasket').addEventListener('change', e => { state.editGasket = e.target.checked; });
+$('btnResetGasket').addEventListener('click', () => { state.gasket = DEFAULT_GASKET.map(q => q.slice()); geomDirty = true; });
+
+bindSeg('segMode', val => { state.view.mode = val; disp.init = false; updateLegend(true); });
+$('chkParticles').addEventListener('change', e => state.view.particles = e.target.checked);
+$('chkStreams').addEventListener('change', e => state.view.streams = e.target.checked);
+$('chkArrows').addEventListener('change', e => state.view.arrows = e.target.checked);
+$('btnPlay').addEventListener('click', () => { state.running = !state.running; $('btnPlay').textContent = state.running ? 'Pause' : 'Play'; });
+$('btnRestart').addEventListener('click', () => {
+  u.fill(0); v.fill(0); p.fill(0); age.fill(0); T.fill(state.params.Tc); simTime = 0; resetParticles(); disp.init = false;
+  smooth.gamma = smooth.dead = null;
+});
+$('btnRef').addEventListener('click', () => {
+  if (state.ref) { state.ref = null; $('btnRef').textContent = 'Pin as reference'; }
+  else {
+    const profiles = {}; for (const key in PROFILES) profiles[key] = sectionProfile(key).vals;
+    state.ref = { ...lastVals, profiles }; $('btnRef').textContent = 'Clear reference';
+  }
+  $('chartLegend').hidden = !state.ref; updateMetrics();
+});
+
+/* ---------- cross-section schematic: pressed plates with the channel between ---------- */
+function drawXsec() {
+  const t = state.params.thick, g = state.params.gap;
+  const k = 24 / (g + t), tp = Math.max(t * k, 1.6), gp = g * k, x0 = 70, x1 = 290;
+  let s = '', y = 8; const plates = [];
+  for (let n = 0; n < 3; n++) { plates.push(y); y += tp + (n < 2 ? gp : 0); }
+  const gy = plates[0] + tp, gy2 = plates[1];
+  s += `<rect class="fl" x="${x0}" y="${gy.toFixed(1)}" width="${x1 - x0 - 8}" height="${(gy2 - gy).toFixed(1)}"/>`;
+  for (const yy of plates) s += `<path class="pl" d="M${x0} ${(yy + tp / 2).toFixed(1)} H${x1}" stroke-width="${tp.toFixed(1)}"/>`;
+  s += `<rect class="gk" x="${x1 - 8}" y="${gy.toFixed(1)}" width="8" height="${(gy2 - gy).toFixed(1)}"/>`;
+  s += `<rect class="gk" x="${x1 - 8}" y="${(plates[1] + tp).toFixed(1)}" width="8" height="${(plates[2] - plates[1] - tp).toFixed(1)}"/>`;
+  const my = (gy + gy2) / 2;
+  s += `<path class="arrow" d="M${x0 + 30} ${my.toFixed(1)} H${x0 + 120} M${x0 + 114} ${(my - 3).toFixed(1)} L${x0 + 120} ${my.toFixed(1)} L${x0 + 114} ${(my + 3).toFixed(1)}"/>`;
+  s += `<path class="dim" d="M${x0 - 6} ${plates[0].toFixed(1)} V${(plates[0] + tp).toFixed(1)} M${x0 - 9} ${plates[0].toFixed(1)} H${x0 - 3} M${x0 - 9} ${(plates[0] + tp).toFixed(1)} H${x0 - 3}"/>`;
+  s += `<text x="${x0 - 12}" y="${(plates[0] + tp / 2 + 3.5).toFixed(1)}" text-anchor="end">t ${t.toFixed(2)}</text>`;
+  s += `<path class="dim" d="M${x0 - 6} ${gy.toFixed(1)} V${gy2.toFixed(1)}"/>`;
+  s += `<text x="${x0 - 12}" y="${(my + 3.5).toFixed(1)}" text-anchor="end">gap ${g.toFixed(1)}</text>`;
+  s += `<text x="${x0 + 128}" y="${(my + 3.5).toFixed(1)}">hot</text>`;
+  s += `<text x="${x0}" y="${(y + 16).toFixed(1)}">pitch ${(t + g).toFixed(2)} mm · schematic</text>`;
+  s += `<text x="${x1 - 8}" y="${(y + 16).toFixed(1)}" text-anchor="end">gasket</text>`;
+  const svg = $('xsec'); svg.setAttribute('viewBox', `0 0 300 ${Math.ceil(y + 22)}`); svg.innerHTML = s;
+}
+
+/* ---------- legend ---------- */
+let legendKey = '';
+function updateLegend(force) {
+  const mode = state.view.mode, L = LUTS[mode]; if (!L) return;
+  const tau = tauNominal(), P = state.params;
+  let title, unit, a, b, c;
+  if (mode === 'speed') { title = 'In-plane speed'; unit = Number.isFinite(lastVals.mean) ? `m/s · plate mean ${lastVals.mean.toFixed(2)}` : 'm/s'; a = '0'; b = (disp.vmax / 2).toFixed(2); c = disp.vmax.toFixed(2); }
+  else if (mode === 'pressure') {
+    const pref = outletPressure();
+    const sc = Math.max(Math.abs(disp.pmax - pref), Math.abs(disp.pmin - pref)) >= 1000 ? 1000 : 1;
+    title = 'Pressure, relative to outlet'; unit = sc === 1000 ? 'kPa' : 'Pa';
+    const f = x => ((x - pref) / sc).toFixed(sc === 1000 ? 2 : 0);
+    a = f(disp.pmin); b = f((disp.pmin + disp.pmax) / 2); c = f(disp.pmax);
+  }
+  else if (mode === 'temp') { title = 'Water temperature'; unit = '°C'; const lo = Math.min(P.Tin, P.Tc), hi = Math.max(P.Tin, P.Tc); a = lo.toFixed(0); b = ((lo + hi) / 2).toFixed(1); c = hi.toFixed(0); }
+  else if (mode === 'htc') { title = 'Overall heat transfer coefficient U'; unit = 'W/m²K'; a = '0'; b = (disp.umax / 2).toFixed(0); c = disp.umax.toFixed(0); }
+  else if (mode === 'turb') { title = 'Turbulence intensity u′/U (estimated)'; unit = '%'; a = '0'; b = (50 * disp.tmax).toFixed(0); c = (100 * disp.tmax).toFixed(0); }
+  else if (mode === 'vort') { title = 'Swirl: blue clockwise, red anticlockwise'; unit = '1/s'; a = (-disp.wmax).toFixed(0); b = '0'; c = disp.wmax.toFixed(0); }
+  else { title = 'Fluid age, in nominal residence times τ'; unit = isFinite(tau) ? `τ = ${tau.toFixed(2)} s` : 'τ'; a = '0'; b = '1.5τ'; c = '≥ 3τ'; }
+  const key = [mode, title, a, b, c, unit, L.stops[0]].join('|');
+  if (!force && key === legendKey) return; legendKey = key;
+  $('legendTitle').textContent = title; $('legendUnit').textContent = unit;
+  $('lg0').textContent = a; $('lg1').textContent = b; $('lg2').textContent = c;
+  $('legendBar').style.background = `linear-gradient(90deg, ${L.stops.join(', ')})`;
+}
+
+/* ---------- metrics, alerts, profile chart ---------- */
+const STATUS = { good: 'var(--good)', warning: 'var(--warning)', serious: 'var(--serious)', critical: 'var(--critical)' };
+const ICON = {
+  warning: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="var(--warning)"/><path d="M8 6v4M8 11.6v.4" stroke="#1d1d1b" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  critical: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--critical)"/><path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>'
+};
+let alertKey = '';
+function renderAlerts() {
+  const key = G.issues.map(i => i.text).join('|'); if (key === alertKey) return; alertKey = key;
+  $('alerts').innerHTML = G.issues.map(i => `<div class="alert">${ICON[i.level]}<span><b>${i.level === 'critical' ? 'Problem' : 'Check'}:</b> ${i.text}</span></div>`).join('');
+}
+let profile = [], profileMean = 0, lastVals = {};
+// what the A–A chart can show; every getter reads the current solution at a cell
+function vortAt(c) {
+  const f = flags[c];
+  const vr = (f & 2) ? vc[c + 1] : vc[c], vl = (f & 1) ? vc[c - 1] : vc[c];
+  const ud = (f & 8) ? uc[c + NX] : uc[c], uu = (f & 4) ? uc[c - NX] : uc[c];
+  return -((vr - vl) / (2 * DX) - (ud - uu) / (2 * DX));
+}
+const PROFILES = {
+  vdown:    { label: 'Downward velocity', unit: 'm/s', zero: true, get: c => vc[c] },
+  speed:    { label: 'Speed', unit: 'm/s', zero: true, get: c => spd[c] },
+  vside:    { label: 'Sideways velocity (+ towards the ports)', unit: 'm/s', zero: true, get: c => uc[c] },
+  pressure: { label: 'Pressure, relative to outlet', unit: 'Pa', zero: false, get: (c, pref) => p[c] - pref },
+  temp:     { label: 'Temperature', unit: '°C', zero: false, get: c => T[c] },
+  htc:      { label: 'Overall heat transfer coefficient U', unit: 'W/m²K', zero: true, get: c => Uloc[c] },
+  age:      { label: 'Fluid age', unit: 's', zero: true, get: c => age[c] },
+  vort:     { label: 'Swirl (+ anticlockwise)', unit: '1/s', zero: true, get: c => vortAt(c) },
+  turb:     { label: 'Turbulence intensity (estimated)', unit: '%', zero: true, get: c => 100 * turbI[c] }
+};
+let profileKey = 'vdown';
+function sectionProfile(key) {
+  const def = PROFILES[key], j = clamp(Math.floor(state.sectionY / CELL), 0, NY - 1), pref = outletPressure();
+  const vals = []; let s = 0, n = 0;
+  for (let i = 0; i < NX; i++) {
+    const c = i + NX * j;
+    if (!fluid[c] || portIn[c] || portOut[c]) { vals.push(null); continue; }
+    const q = def.get(c, pref); vals.push(q); s += q; n++;
+  }
+  return { vals, mean: n ? s / n : 0, n };
+}
+const smooth = { gamma: null, dead: null, Tout: null };
+const ema = (key, x, k) => (smooth[key] = smooth[key] === null ? x : smooth[key] + (x - smooth[key]) * k);
+function show(id, val, unit, digits, refVal, extra) {
+  const txt = Number.isFinite(val) ? val.toFixed(digits) : '–';
+  let ref = '';
+  if (state.ref && Number.isFinite(refVal) && Number.isFinite(val)) {
+    const d = val - refVal, sign = d > 0 ? '+' : d < 0 ? '−' : '±';
+    ref = `<span class="ref">ref ${refVal.toFixed(digits)} · ${sign}${Math.abs(d).toFixed(digits)}</span>`;
+  }
+  $(id).innerHTML = `${txt}<small>${unit}${extra ? ' ' + extra : ''}</small>${ref}`;
+}
+function updateMetrics() {
+  const F = G.F, P = state.params, h = P.gap / 1000;
+  let sum = 0, n = 0, Usum = 0;
+  for (let k = 0; k < fluidList.length; k++) { const c = fluidList[k]; if (portIn[c] || portOut[c]) continue; sum += spd[c]; Usum += Uloc[c]; n++; }
+  const mean = n ? sum / n : 0;
+  let dead = 0; for (let k = 0; k < fluidList.length; k++) { const c = fluidList[k]; if (portIn[c] || portOut[c]) continue; if (spd[c] < 0.1 * mean) dead++; }
+  const pin = inCells.length ? inCells.reduce((s, c) => s + p[c], 0) / inCells.length : 0;
+  const Re = F.rho * mean * 2 * h / F.mu;
+  const ToutRaw = outCells.length ? outCells.reduce((s, c) => s + T[c], 0) / outCells.length : P.Tc;
+  const Tout = ema('Tout', ToutRaw, 0.3);
+  const duty = F.rho * F.cp * G.Q * (P.Tin - Tout) / 1000;
+  const eff = Math.abs(P.Tin - P.Tc) > 0.1 ? (P.Tin - Tout) / (P.Tin - P.Tc) * 100 : NaN;
+  const deadPct = ema('dead', n ? 100 * dead / n : 0, 0.25);
+  const dp = (pin - outletPressure()) / 1000;
+  const vals = { Q: G.Q * 60000, vP: G.vPortEff, dp, Re, mean, dead: deadPct, Tout, duty, U: n ? Usum / n : 0, eff };
+  const r = state.ref || {};
+  show('mQ', vals.Q, 'L/min', 1, r.Q);
+  show('mV', vals.vP, 'm/s', 2, r.vP);
+  show('mDp', vals.dp, 'kPa', 2, r.dp);
+  show('mRe', vals.Re, '', 0, r.Re, Re < 1000 ? 'low' : Re < 2300 ? 'moderate' : 'high');
+  show('mU', vals.mean, 'm/s', 2, r.mean);
+  show('mDead', vals.dead, '% under 10% of mean', 1, r.dead);
+  show('mTout', vals.Tout, '°C', 1, r.Tout);
+  show('mDuty', vals.duty, 'kW', 2, r.duty);
+  show('mUht', vals.U, 'W/m²K', 0, r.U);
+  show('mEff', vals.eff, '%', 0, r.eff);
+  lastVals = vals;
+  syncPortStats(); renderAlerts(); updateLegend(false);
+
+  // flow uniformity always comes from the downward velocity across A–A
+  const vd = sectionProfile('vdown');
+  let dev = 0; for (const q of vd.vals) if (q !== null) dev += Math.abs(q - vd.mean);
+  const gRaw = vd.n && Math.abs(vd.mean) > 1e-6 ? 1 - dev / (2 * vd.n * Math.abs(vd.mean)) : 0;
+  // the chart shows whichever quantity is picked
+  const sel = profileKey === 'vdown' ? vd : sectionProfile(profileKey);
+  profile = sel.vals; profileMean = sel.mean;
+  // the flow is unsteady, so smooth the reading; restart it when the section moves
+  if (chartDirty) smooth.gamma = null;
+  const gamma = ema('gamma', gRaw, 0.25);
+  const lvl = gamma >= 0.9 ? 'good' : gamma >= 0.75 ? 'warning' : 'serious';
+  const chip = $('uniChip');
+  chip.querySelector('i').style.background = STATUS[lvl];
+  chip.querySelector('span').textContent = `Flow uniformity ${(gamma * 100).toFixed(0)}% · ${lvl === 'good' ? 'even' : lvl === 'warning' ? 'uneven' : 'poor'}`;
+  drawChart();
+}
+function niceStep(range, n) {
+  const raw = range / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag;
+}
+let chartGeom = null, chartDirty = false, chartHoverX = null;
+function drawChart() {
+  const svg = $('profile'), w = Math.max(200, svg.clientWidth || 300), h = 170;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const m = { l: 44, r: 10, t: 22, b: 26 }, iw = w - m.l - m.r, ih = h - m.t - m.b;
+  const def = PROFILES[profileKey];
+  svg.setAttribute('aria-label', `Line chart of ${def.label.toLowerCase()} across the plate width at section A–A`);
+  const rawRef = state.ref && state.ref.profiles ? state.ref.profiles[profileKey] : null;
+  const rawVals = profile.filter(q => q !== null), rawR = rawRef ? rawRef.filter(q => q !== null) : [];
+  if (!rawVals.length) { svg.innerHTML = `<text class="axis-text" x="${w / 2}" y="${h / 2}" text-anchor="middle">Section A–A crosses no open channel</text>`; chartGeom = null; return; }
+  // pressure switches to kPa when it gets large
+  const big = Math.max(...rawVals.map(Math.abs), ...rawR.map(Math.abs));
+  const sc = profileKey === 'pressure' && big >= 1000 ? 1000 : 1, unit = sc === 1000 ? 'kPa' : def.unit;
+  const prof = profile.map(q => q === null ? null : q / sc), refP = rawRef ? rawRef.map(q => q === null ? null : q / sc) : null;
+  const vals = rawVals.map(q => q / sc), rvals = rawR.map(q => q / sc), meanV = profileMean / sc;
+  let lo = Math.min(...vals, ...rvals), hi = Math.max(...vals, ...rvals);
+  if (def.zero) { lo = Math.min(0, lo); hi = Math.max(0, hi); }
+  let span = hi - lo; if (span < 1e-9) span = Math.max(Math.abs(hi) * 0.1, 1e-3);
+  hi += span * 0.08; if (!def.zero || lo < 0) lo -= span * 0.08;
+  const stp = niceStep(hi - lo, 4); lo = Math.floor(lo / stp) * stp; hi = Math.ceil(hi / stp) * stp;
+  const dig = Math.max(0, -Math.floor(Math.log10(stp) + 1e-9)), base = def.zero ? 0 : lo;
+  chartFmt = { sc, unit, dig: dig + 1, refP, prof };
+  const X = mm => m.l + mm / W * iw, Y = val => m.t + (hi - val) / (hi - lo) * ih;
+  let s = '';
+  for (let t = lo; t <= hi + 1e-9; t += stp) {
+    const y = Y(t).toFixed(1);
+    s += `<line class="${Math.abs(t) < 1e-9 ? 'zero' : 'grid'}" x1="${m.l}" x2="${w - m.r}" y1="${y}" y2="${y}"/>`;
+    s += `<text class="axis-text" x="${m.l - 6}" y="${(+y + 3.5).toFixed(1)}" text-anchor="end">${(Math.abs(t) < stp / 1e6 ? 0 : t).toFixed(dig)}</text>`;
+  }
+  for (const xm of [0, 50, 100, 150, 200]) s += `<text class="axis-text" x="${X(xm).toFixed(1)}" y="${h - 8}" text-anchor="${xm === 200 ? 'end' : 'middle'}">${xm}${xm === 200 ? ' mm' : ''}</text>`;
+  s += `<text class="axis-text" x="${m.l - 6}" y="${m.t - 12}" text-anchor="end">${unit}</text>`;
+  const paths = arr => {
+    let line = '', area = '', run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        line += run.map((q, k) => `${k ? 'L' : 'M'}${X(q[0]).toFixed(1)} ${Y(q[1]).toFixed(1)}`).join(' ');
+        area += `M${X(run[0][0]).toFixed(1)} ${Y(base).toFixed(1)} ` + run.map(q => `L${X(q[0]).toFixed(1)} ${Y(q[1]).toFixed(1)}`).join(' ') + ` L${X(run[run.length - 1][0]).toFixed(1)} ${Y(base).toFixed(1)}Z `;
+      }
+      run = [];
+    };
+    arr.forEach((q, i) => { if (q === null) flush(); else run.push([(i + 0.5) * CELL, q]); }); flush();
+    return { line, area };
+  };
+  const cur = paths(prof);
+  s += `<path class="area" d="${cur.area}"/>`;
+  if (refP) s += `<path class="refline" d="${paths(refP).line}"/>`;
+  s += `<path class="line" d="${cur.line}"/>`;
+  const ym = Y(meanV).toFixed(1);
+  s += `<line class="mean" x1="${m.l}" x2="${w - m.r}" y1="${ym}" y2="${ym}"/>`;
+  s += `<text class="mean-text" x="${w - m.r}" y="${(+ym - 5).toFixed(1)}" text-anchor="end">mean ${meanV.toFixed(dig + 1)}</text>`;
+  s += `<g id="hov" visibility="hidden"><line class="cross" id="hovLine" y1="${m.t}" y2="${m.t + ih}"/><circle class="dot" id="hovDot" r="4"/></g>`;
+  s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+  svg.innerHTML = s;
+  chartGeom = { X, Y, m, iw, w };
+  if (chartHoverX !== null) showChartHover(chartHoverX);
+}
+let chartFmt = null;
+function showChartHover(clientX) {
+  const svg = $('profile'), r = svg.getBoundingClientRect(); if (!chartGeom || !chartFmt) return;
+  const sx = (clientX - r.left) * (chartGeom.w / r.width);
+  const mm = clamp((sx - chartGeom.m.l) / chartGeom.iw * W, 0, W - 0.01), i = Math.floor(mm / CELL), q = chartFmt.prof[i];
+  const g = svg.querySelector('#hov'), tip = $('tip');
+  if (q === null || q === undefined) { g.setAttribute('visibility', 'hidden'); tip.hidden = true; return; }
+  const x = chartGeom.X((i + 0.5) * CELL), y = chartGeom.Y(q);
+  g.setAttribute('visibility', 'visible');
+  svg.querySelector('#hovLine').setAttribute('x1', x); svg.querySelector('#hovLine').setAttribute('x2', x);
+  svg.querySelector('#hovDot').setAttribute('cx', x); svg.querySelector('#hovDot').setAttribute('cy', y);
+  const rq = chartFmt.refP ? chartFmt.refP[i] : null, d = chartFmt.dig;
+  tip.hidden = false; tip.textContent = `x ${((i + 0.5) * CELL).toFixed(0)} mm · ${q.toFixed(d)} ${chartFmt.unit}${rq !== null && rq !== undefined ? ` · ref ${rq.toFixed(d)}` : ''}`;
+  const scale = r.width / chartGeom.w;
+  tip.style.left = `${clamp(x * scale, 80, r.width - 80)}px`; tip.style.top = `${y * scale - 8}px`;
+}
+$('selProfile').addEventListener('change', e => { profileKey = e.target.value; updateMetrics(); });
+$('profile').addEventListener('pointermove', e => { chartHoverX = e.clientX; showChartHover(e.clientX); });
+$('profile').addEventListener('pointerleave', () => { chartHoverX = null; $('tip').hidden = true; const g = $('profile').querySelector('#hov'); if (g) g.setAttribute('visibility', 'hidden'); });
+
+/* ================= main loop ================= */
+let geomDirty = true, extraIters = 0, frameNo = 0, lastStreamFrame = 0;
+const plate = makeView('cvPlate', 'plateWrap', true);
+const detail = makeView('cvDetail', 'detailWrap', false);
+bindView(plate); bindView(detail);
+
+function maxSpeed() {
+  let umax = 0.02;
+  for (let n = 0; n < fluidList.length; n += 3) { const c = fluidList[n]; if (spd[c] > umax) umax = spd[c]; }
+  return umax;
+}
+// simulated seconds per frame: 8 ms for fast flows, up to 40 ms when the flow is slow, so the fastest water moves
+// about two grid cells a frame and slow designs still settle within seconds
+const frameStep = () => clamp(2 * DX / maxSpeed(), 0.008, 0.04);
+function advance(frameDt) {
+  const umax = maxSpeed();
+  const nsub = clamp(Math.ceil(frameDt * umax / (3.5 * DX)), 1, 6), dt = frameDt / nsub;
+  for (let k = 0; k < nsub; k++) {
+    const it = 32 + (extraIters > 0 ? (editingShape() ? 12 : 60) : 0); if (extraIters > 0) extraIters--;
+    step(dt, it);
+  }
+  moveParticles(frameDt);
+}
+function frame() {
+  if (geomDirty) { geomDirty = false; rebuildGeometry(); extraIters = Math.max(extraIters, 20); }
+  if (state.running) advance(frameStep());
+  computeVel(); computeThermal(); colorize();
+  const streamDue = G.streamsDirty ? (!editingShape() || frameNo - lastStreamFrame >= 10) : (state.running && frameNo % 20 === 0);
+  if (streamDue) { computeStreams(); G.streamsDirty = false; lastStreamFrame = frameNo; }
+  fitView(plate);
+  detail.region = detailRegion(); fitView(detail);
+  drawView(plate); drawView(detail);
+  plate.ready = detail.ready = true;
+  if (frameNo % 10 === 0 || chartDirty) { updateMetrics(); chartDirty = false; }
+  frameNo++;
+  requestAnimationFrame(frame);
+}
+
+/* ================= boot ================= */
+function boot() {
+  readTheme();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { state.view.particles = false; $('chkParticles').checked = false; }
+  T.fill(state.params.Tc);
+  rebuildGeometry(); geomDirty = false;
+  for (let n = 0; n < fluidList.length; n++) T[fluidList[n]] = (state.params.Tin + state.params.Tc) / 2;
+  resetParticles();
+  // warm-up so the first frame shows developed flow and temperatures
+  computeVel(); computeThermal();
+  step(0.004, 400);
+  // run until the water has passed through the channel about twice, so temperatures have settled too
+  let tSim = 0;
+  for (let k = 0; k < 90; k++) {
+    const dt = clamp(2 * DX / maxSpeed(), 0.004, 0.05);
+    step(dt, 36); tSim += dt;
+    if (k % 3 === 0) { computeVel(); computeThermal(); }
+  }
+  // the flow has settled; carry temperature and age on alone (much cheaper) until about 2.5 channel volumes have passed
+  computeVel(); computeThermal();
+  for (let k = 0; k < 400 && tSim < 2.5 * tauNominal(); k++) { const dt = clamp(4 * DX / maxSpeed(), 0.004, 0.12); transportScalars(dt); tSim += dt; }
+  for (let k = 0; k < 60; k++) moveParticles(frameStep());
+  syncPortUI(); syncPatternUI(); drawXsec();
+  requestAnimationFrame(frame);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme);
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+boot();
+})();
+</script>
+
+</body>
+</html>
