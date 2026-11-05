@@ -33,6 +33,7 @@
   --trace: rgba(12, 28, 42, 0.42);
   --rib: rgba(16, 30, 42, 0.30);
   --rib-hi: rgba(255, 255, 255, 0.45);
+  --contact: rgba(16, 30, 42, 0.62);
   --series: #2a78d6;
   --series-fill: rgba(42, 120, 214, 0.14);
   --good: #0ca30c;
@@ -65,6 +66,7 @@
     --trace: rgba(236, 244, 250, 0.45);
     --rib: rgba(0, 0, 0, 0.42);
     --rib-hi: rgba(255, 255, 255, 0.16);
+    --contact: rgba(225, 235, 242, 0.55);
     --series: #3987e5;
     --series-fill: rgba(57, 135, 229, 0.18);
     color-scheme: dark;
@@ -90,6 +92,7 @@
   --trace: rgba(236, 244, 250, 0.45);
   --rib: rgba(0, 0, 0, 0.42);
   --rib-hi: rgba(255, 255, 255, 0.16);
+  --contact: rgba(225, 235, 242, 0.55);
   --series: #3987e5;
   --series-fill: rgba(57, 135, 229, 0.18);
   color-scheme: dark;
@@ -216,6 +219,9 @@ figure { margin: 0; }
 .ctl h2 { margin: 0; font-size: 0.8rem; color: var(--ink-2); }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; padding: 2px; gap: 2px; background: var(--bg); }
 .seg.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.seg.modes { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.seg.modes button { grid-column: span 3; }
+.seg.modes button.wide { grid-column: span 4; }
 .seg button {
   flex: 1 1 0; min-width: 0; border: 0; background: transparent; padding: 6px 6px; border-radius: 3px; cursor: pointer;
   font-size: 13.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -360,6 +366,7 @@ figure { margin: 0; }
               <option value="htc">Heat transfer coefficient U</option>
               <option value="age">Fluid age</option>
               <option value="vort">Swirl</option>
+              <option value="turb">Turbulence intensity</option>
             </select></label>
           <span class="chip" id="uniChip" title="Flow uniformity of the downward velocity across A–A"><i></i><span>–</span></span>
         </div>
@@ -452,13 +459,14 @@ figure { margin: 0; }
 
     <section class="ctl" aria-labelledby="hView">
       <h2 id="hView">View</h2>
-      <div class="seg grid3" role="group" aria-label="Colour the plate by" id="segMode">
+      <div class="seg modes" role="group" aria-label="Colour the plate by" id="segMode">
         <button type="button" data-v="speed" aria-pressed="true">Speed</button>
         <button type="button" data-v="pressure" aria-pressed="false">Pressure</button>
-        <button type="button" data-v="temp" aria-pressed="false">Temperature</button>
-        <button type="button" data-v="htc" aria-pressed="false">Heat transfer</button>
         <button type="button" data-v="age" aria-pressed="false">Age</button>
         <button type="button" data-v="vort" aria-pressed="false">Swirl</button>
+        <button type="button" class="wide" data-v="temp" aria-pressed="false">Temperature</button>
+        <button type="button" class="wide" data-v="htc" aria-pressed="false">Heat transfer</button>
+        <button type="button" class="wide" data-v="turb" aria-pressed="false">Turbulence</button>
       </div>
       <div class="checks">
         <label class="check" for="chkParticles"><input type="checkbox" id="chkParticles" checked> Particles</label>
@@ -471,7 +479,7 @@ figure { margin: 0; }
         <button type="button" class="btn" id="btnRef">Pin as reference</button>
       </div>
       <p class="hint">Pin a design as a reference, change something, and every readout and the A–A profile show the comparison.</p>
-      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution areas carry an open "chocolate" stud pattern with low resistance that is the same in every direction, modelled with the same correlations at an effective 25° (assumed). In the ribbed area, particles travel in two layers that follow each plate's ribs and swap where the streams cross; their average is the computed flow. The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
+      <p class="hint">Model: 2-D incompressible flow averaged across the channel gap, on 2 mm cells. Flat areas use Hele-Shaw wall friction (12μ/h²). Chevron areas use Martin's friction and Nusselt correlations (VDI Heat Atlas), set by the local flow angle to the ribs. The distribution areas carry an open "chocolate" stud pattern with low resistance that is the same in every direction, modelled with the same correlations at an effective 25° (assumed). The plate is shown stacked against an identical plate turned over (dashed ribs); the dots are where their ridges touch. In the ribbed area, particles travel in two layers that follow each plate's furrows. They flow round the contact points, churn in the recirculation behind them, and switch furrows there: rarely below about 45°, often above 60°, where the flow zigzags. Turbulence is estimated from the energy the ribs take out of the flow beyond plain wall friction, switching on between Re ≈ 60 and 600 (calibrated, not measured). The cold side is held at a constant temperature, with the same film coefficient as the hot side.</p>
     </section>
   </aside>
 </main>
@@ -1006,20 +1014,33 @@ function transportScalars(dt) {
   let t = age; age = age1; age1 = t; t = T; T = T1; T1 = t;
 }
 
-/* ---------- local heat transfer coefficient ---------- */
+/* ---------- local heat transfer coefficient and turbulence estimate ---------- */
+// Turbulence estimate: the ribs and contact points take energy out of the mean flow beyond plain laminar wall friction.
+// That excess, eps = (k − k_flat)·U² per kg, feeds the swirl and eddies. An energy-cascade scale over half the gap gives
+// a fluctuating velocity u′ ≈ C·γ·(eps·h/2)^(1/3), where γ ramps the flow from steady to unsteady across Re ≈ 60–600
+// (chevron channels are reported to turn unsteady from about Re 100). C = 0.5 is a calibration choice.
+const RE_T0 = 60, RE_T1 = 600, TURB_C = 0.5;
+const turbI = new Float32Array(NC), turbU = new Float32Array(NC);
 function computeThermal() {
   const P = state.params, F = G.F, h = P.gap / 1000, Dh = 2 * h, reC = F.rho * Dh / F.mu;
+  const kFlat = 12 * F.mu / (F.rho * h * h), kChev = F.mu / (2 * F.rho * Dh * Dh);
   const prf = 0.122 * Math.cbrt(F.Pr), wall = P.thick / 1000 / K_STEEL, phi = state.zones.phi, lamC = 2 / (F.rho * F.cp * h);
   for (let n = 0; n < fluidList.length; n++) {
     const c = fluidList[n];
-    let Nu = NU_FLAT;
-    const zc = zoneC[c];
+    let Nu = NU_FLAT, kc = kFlat;
+    const zc = zoneC[c], Re = reC * spd[c];
     if (zc === 2) {
-      const Re = reC * spd[c]; ribAngles(uc[c], vc[c], phi);
+      ribAngles(uc[c], vc[c], phi);
       Nu = Math.max(NU_FLAT, prf * 0.5 * (lut(NUB, Re, RA1) + lut(NUB, Re, RA2)));
+      kc = 0.5 * (lut(XR, Re, RA1) + lut(XR, Re, RA2)) * kChev;
     } else if (zc === 1 || zc === 3) {
-      Nu = Math.max(NU_FLAT, prf * lut(NUB, reC * spd[c], DIST_PSI));
+      Nu = Math.max(NU_FLAT, prf * lut(NUB, Re, DIST_PSI));
+      kc = lut(XR, Re, DIST_PSI) * kChev;
     }
+    const sp0 = spd[c], eps = Math.max(0, kc - kFlat) * sp0 * sp0;
+    const xg = clamp((Re - RE_T0) / (RE_T1 - RE_T0), 0, 1), gam = xg * xg * (3 - 2 * xg);
+    const up = (portIn[c] || portOut[c]) ? 0 : TURB_C * gam * Math.cbrt(eps * 0.5 * h);
+    turbU[c] = up; turbI[c] = sp0 > 1e-5 ? up / sp0 : 0;
     const hc = Nu * F.k / Dh, U = 1 / (2 / hc + wall);
     Uloc[c] = (portIn[c] || portOut[c]) ? 0 : U;
     lam[c] = (portIn[c] || portOut[c]) ? 0 : U * lamC;
@@ -1033,6 +1054,9 @@ const px = new Float32Array(NPART), py = new Float32Array(NPART), ppx = new Floa
 // swap where they meet. Each particle rides in one of the two layers. The layer speeds are chosen so that their average
 // is exactly the computed (depth-averaged) flow, so the particles show the criss-cross without changing the flow.
 const player = new Int8Array(NPART);
+// turbulent velocity of each particle (m/s, Ornstein–Uhlenbeck process) and the last contact point it passed
+const tvx = new Float32Array(NPART), tvy = new Float32Array(NPART), lastC = new Int32Array(NPART).fill(-1);
+function gauss() { let u1 = Math.random(); if (u1 < 1e-12) u1 = 1e-12; return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * Math.random()); }
 function spawn(k, anywhere) {
   let c;
   if (!anywhere && inCells.length) c = inCells[(Math.random() * inCells.length) | 0];
@@ -1040,33 +1064,59 @@ function spawn(k, anywhere) {
   px[k] = ppx[k] = c % NX + Math.random(); py[k] = ppy[k] = ((c / NX) | 0) + Math.random();
   plife[k] = anywhere ? Math.random() * 2 : 0;
   player[k] = Math.random() < 0.5 ? 1 : -1;
+  tvx[k] = tvy[k] = 0; lastC[k] = -1;
 }
 function resetParticles() { for (let k = 0; k < NPART; k++) spawn(k, true); }
 function tauNominal() { return G.Q > 0 ? (G.fluidArea * 1e-6 * state.params.gap / 1000) / G.Q : Infinity; }
 function moveParticles(dt) {
   const inv = dt / DX, pOut = 1 - Math.exp(-Math.abs(G.Sout) * dt), maxLife = Math.min(60, 6 * tauNominal());
   const z = state.zones, ph = z.phi / DEG, sP = Math.sin(ph), cP = Math.cos(ph);
-  // furrow flow dominates at low angles; at high angles the streams increasingly cross over the furrows
-  const follow = clamp((85 - z.phi) / 40, 0.25, 1), lMix = (20 + 70 * cP * cP) / 1000;
+  // below ~45° the water mostly stays in its groove ("cross flow"); above ~60° it zigzags, turning back at contact points
+  const follow = clamp(1 - (z.phi - 60) / 50, 0.6, 1), pSwap = clamp((z.phi - 40) / 25, 0.12, 0.8);
+  const pitch = ribPitch(), rPost = Math.max(0.8, 0.12 * pitch), halfGap = state.params.gap / 2000;
   const ok = (qx, qy) => qx >= 0 && qy >= 0 && (qx | 0) < NX && (qy | 0) < NY && fluid[(qx | 0) + NX * (qy | 0)];
   for (let k = 0; k < NPART; k++) {
     const x = px[k], y = py[k]; ppx[k] = x; ppy[k] = y;
     const a = sampleU(x, y), b = sampleV(x, y);
     const xm = x + 0.5 * inv * a, ym = y + 0.5 * inv * b;
     let mx = inv * sampleU(xm, ym), my = inv * sampleV(xm, ym), fx = 0, fy = 0;
-    const c0 = (x | 0) + NX * (y | 0);
-    if (z.chev && zoneC[c0] === 2) {
-      const U = Math.hypot(a, b);
-      if (U > 1e-4) {
-        const sg = x * CELL < W / 2 ? 1 : -1, L = player[k];
-        const s = b / cP + L * a / (sg * sP);
-        let vx = s * L * sg * sP, vy = s * cP;
-        const vm = Math.hypot(vx, vy); if (vm > 3 * U) { vx *= 3 * U / vm; vy *= 3 * U / vm; }
-        fx = follow * (vx - a) * inv; fy = follow * (vy - b) * inv;
-        if (Math.random() < 1 - Math.exp(-U * dt / lMix)) player[k] = -L;
+    const c0 = (x | 0) + NX * (y | 0), U = Math.hypot(a, b), inChev = z.chev && zoneC[c0] === 2;
+    if (inChev && U > 1e-4) {
+      const sg = x * CELL < W / 2 ? 1 : -1, L = player[k];
+      const s = b / cP + L * a / (sg * sP);
+      let vx = s * L * sg * sP, vy = s * cP;
+      const vm = Math.hypot(vx, vy); if (vm > 3 * U) { vx *= 3 * U / vm; vy *= 3 * U / vm; }
+      fx = follow * (vx - a) * inv; fy = follow * (vy - b) * inv;
+    }
+    // recirculation zone just behind a contact point: the water there is slow and churning
+    let slow = 1, boost = 1;
+    if (inChev && U > 1e-4) {
+      const nc = nearestContact(x * CELL, y * CELL);
+      if (nc) {
+        const rx = x * CELL - nc.x, ry = y * CELL - nc.y, along = (rx * a + ry * b) / U, lat = Math.abs(rx * b - ry * a) / U;
+        if (along > 0 && along < 4 * rPost && lat < 1.6 * rPost) { slow = 0.3; boost = 1.8; }
       }
     }
-    let nx = x + mx + fx, ny = y + my + fy;
+    // turbulent fluctuation, correlated over the eddy turnover time (half the gap ÷ u′)
+    const sig = turbU[c0] * boost;
+    if (sig > 1e-6) {
+      const TL = clamp(halfGap / sig, 0.004, 0.25), dec = Math.exp(-dt / TL), amp = sig * Math.sqrt(1 - dec * dec);
+      tvx[k] = tvx[k] * dec + amp * gauss(); tvy[k] = tvy[k] * dec + amp * gauss();
+    } else { tvx[k] *= 0.5; tvy[k] *= 0.5; }
+    let nx = x + (mx + fx) * slow + tvx[k] * inv, ny = y + (my + fy) * slow + tvy[k] * inv;
+    if (inChev) {
+      const nc = nearestContact(nx * CELL, ny * CELL);
+      if (nc) {
+        let rx = nx * CELL - nc.x, ry = ny * CELL - nc.y, d = Math.hypot(rx, ry);
+        // the plates touch here, so water has to go round the contact point
+        if (d < rPost) {
+          if (d < 1e-6) { rx = -b; ry = a; d = Math.hypot(rx, ry) || 1; }
+          nx = (nc.x + rx / d * rPost) / CELL; ny = (nc.y + ry / d * rPost) / CELL;
+        }
+        // where the two furrow streams cross, water can switch to the other plate's furrows
+        if (d < 0.45 * pitch && nc.id !== lastC[k]) { lastC[k] = nc.id; if (Math.random() < pSwap) player[k] = -player[k]; }
+      }
+    }
     if (!ok(nx, ny)) { player[k] = -player[k]; nx = x + mx; ny = y + my; }   // a furrow stream turns at the gasket
     // at the herringbone apex one plate's furrows meet head-on, so the water hands over to the facing plate's furrows
     else if (fx !== 0 && (x * CELL < W / 2) !== (nx * CELL < W / 2)) player[k] = -player[k];
@@ -1105,18 +1155,62 @@ function computeStreams() {
 }
 
 /* ---------- pressing pattern (drawn in plate mm) ---------- */
+// corrugation pitch scales with pressing depth (pitch ≈ 3.5 × depth on typical plates)
+const ribPitch = () => clamp(3.5 * state.params.gap, 5, 14);
+// contact points between this plate and the identical plate turned over against it, with a spatial hash for lookups
+const CT = { xs: new Float32Array(0), ys: new Float32Array(0), grid: [], gs: 7, gnx: 1, gny: 1 };
+function nearestContact(xm, ym) {
+  const gx = Math.floor(xm / CT.gs), gy = Math.floor(ym / CT.gs);
+  let best = -1, bd = Infinity;
+  for (let j = gy - 1; j <= gy + 1; j++) {
+    if (j < 0 || j >= CT.gny) continue;
+    for (let i = gx - 1; i <= gx + 1; i++) {
+      if (i < 0 || i >= CT.gnx) continue;
+      const cell = CT.grid[i + CT.gnx * j]; if (!cell) continue;
+      for (const id of cell) { const d = (CT.xs[id] - xm) ** 2 + (CT.ys[id] - ym) ** 2; if (d < bd) { bd = d; best = id; } }
+    }
+  }
+  return best < 0 ? null : { id: best, x: CT.xs[best], y: CT.ys[best], d: Math.sqrt(bd) };
+}
 function buildPattern() {
-  const z = state.zones, ribs = new Path2D(), lattice = new Path2D(), centre = new Path2D();
+  const z = state.zones, ribs = new Path2D(), ribsB = new Path2D(), contacts = new Path2D(), lattice = new Path2D(), centre = new Path2D();
   let chevTop = 0, chevBot = H;
   if (z.dist) { chevTop = Infinity; chevBot = -Infinity; for (let i = 0; i < NX; i++) { chevTop = Math.min(chevTop, yTopB[i]); chevBot = Math.max(chevBot, yBotB[i]); } }
   const regions = { chev: null, dist: null };
   const xs = i => (i + 0.5) * CELL;
   if (z.chev && chevBot > chevTop) {
-    const phi = z.phi / DEG, pitch = 6.5, sx = Math.sin(phi), cy = Math.cos(phi);
+    const phi = z.phi / DEG, pitch = ribPitch(), sx = Math.sin(phi), cy = Math.cos(phi);
     const stepC = pitch / sx, Lr = (W / 2 + 4) / sx;
+    const aLines = [], bLines = [];
+    // this plate: a V pointing down
     for (let c0 = chevTop; c0 <= chevBot + Lr * cy + stepC; c0 += stepC) {
+      aLines.push(c0);
       ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 - Lr * sx, c0 - Lr * cy);
       ribs.moveTo(W / 2, c0); ribs.lineTo(W / 2 + Lr * sx, c0 - Lr * cy);
+    }
+    // the identical plate turned over against it: its V points up, so its ridges cross these ones
+    for (let d0 = chevTop - Lr * cy - stepC / 2; d0 <= chevBot + stepC; d0 += stepC) {
+      bLines.push(d0);
+      ribsB.moveTo(W / 2, d0); ribsB.lineTo(W / 2 - Lr * sx, d0 + Lr * cy);
+      ribsB.moveTo(W / 2, d0); ribsB.lineTo(W / 2 + Lr * sx, d0 + Lr * cy);
+    }
+    // the plates touch wherever a ridge of one crosses a ridge of the other
+    const cx = [], cyy = [], rC = Math.max(0.6, 0.11 * pitch);
+    for (const c0 of aLines) for (const d0 of bLines) {
+      if (d0 >= c0) continue;
+      const t = (c0 - d0) / (2 * cy); if (t * sx > W / 2) continue;
+      const yy = (c0 + d0) / 2;
+      for (const xx of [W / 2 - t * sx, W / 2 + t * sx]) {
+        const ci = Math.floor(xx / CELL), cj = Math.floor(yy / CELL);
+        if (ci < 0 || cj < 0 || ci >= NX || cj >= NY || zoneC[ci + NX * cj] !== 2) continue;
+        cx.push(xx); cyy.push(yy); contacts.moveTo(xx + rC, yy); contacts.arc(xx, yy, rC, 0, 2 * Math.PI);
+      }
+    }
+    CT.xs = Float32Array.from(cx); CT.ys = Float32Array.from(cyy); CT.gs = pitch;
+    CT.gnx = Math.ceil(W / pitch) + 1; CT.gny = Math.ceil(H / pitch) + 1; CT.grid = new Array(CT.gnx * CT.gny);
+    for (let id = 0; id < cx.length; id++) {
+      const g = Math.floor(cx[id] / pitch) + CT.gnx * Math.floor(cyy[id] / pitch);
+      (CT.grid[g] || (CT.grid[g] = [])).push(id);
     }
     const ic = NX / 2 | 0;
     centre.moveTo(W / 2, z.dist ? yTopB[ic] : 0); centre.lineTo(W / 2, z.dist ? yBotB[ic] : H);
@@ -1152,7 +1246,8 @@ function buildPattern() {
     if (!regions[k]) continue;
     const cp = new Path2D(); cp.addPath(regions[k]); cp.addPath(G.portPath.in); cp.addPath(G.portPath.out); regions[k] = cp;
   }
-  G.pattern = { ribs, lattice, centre, regions, chevTop, chevBot }; VER.pattern++;
+  if (!(z.chev && chevBot > chevTop)) { CT.xs = new Float32Array(0); CT.ys = new Float32Array(0); CT.grid = []; }
+  G.pattern = { ribs, ribsB, contacts, lattice, centre, regions, chevTop, chevBot }; VER.pattern++;
 }
 function drawPattern(ctx, view) {
   const P = G.pattern; if (!P || !state.zones.show) return;
@@ -1166,6 +1261,15 @@ function drawPattern(ctx, view) {
     ctx.restore();
   };
   pass(P.ribs, P.regions.chev, view.isPlate ? 1.1 : 1.5);
+  if (P.regions.chev) {
+    // the plate behind, seen through the gap: lighter and dashed; the contact points where the two touch
+    ctx.save(); ctx.clip(P.regions.chev, 'evenodd');
+    ctx.setLineDash([2.2 * px1 * (view.isPlate ? 1 : 1.5), 2.2 * px1 * (view.isPlate ? 1 : 1.5)]);
+    ctx.globalAlpha = 0.6; ctx.lineWidth = (view.isPlate ? 0.9 : 1.2) * px1; ctx.strokeStyle = theme.rib; ctx.stroke(P.ribsB);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.fillStyle = theme.contact; ctx.fill(P.contacts);
+    ctx.restore();
+  }
   pass(P.centre, P.regions.chev, view.isPlate ? 1.4 : 2);
   pass(P.lattice, P.regions.dist, view.isPlate ? 0.9 : 1.3);
 }
@@ -1178,7 +1282,8 @@ const RAMPS = {
     vort:     ['#184f95', '#3987e5', '#9ec5f4', '#f0efec', '#f2a9a8', '#e34948', '#a32c2b'],
     temp:     ['#184f95', '#3987e5', '#9ec5f4', '#f0efec', '#f2a9a8', '#e34948', '#a32c2b'],
     htc:      ['#effaf5', '#c8eedd', '#8fdcbc', '#4cc196', '#1baf7a', '#138a5f', '#0b5e40'],
-    age:      ['#fdf3ee', '#f9d5c2', '#f3a982', '#eb6834', '#c4501f', '#8f3713', '#5c230b']
+    age:      ['#fdf3ee', '#f9d5c2', '#f3a982', '#eb6834', '#c4501f', '#8f3713', '#5c230b'],
+    turb:     ['#fcf1f5', '#f7d2e0', '#efa6c3', '#e87ba4', '#d55181', '#a83a62', '#702542']
   },
   dark: {
     speed:    ['#111a24', '#104281', '#1c5cab', '#2a78d6', '#5598e7', '#86b6ef', '#cde2fb'],
@@ -1186,7 +1291,8 @@ const RAMPS = {
     vort:     ['#86b6ef', '#3987e5', '#1c5cab', '#383835', '#a83a39', '#e66767', '#f2a9a8'],
     temp:     ['#86b6ef', '#3987e5', '#1c5cab', '#383835', '#a83a39', '#e66767', '#f2a9a8'],
     htc:      ['#0f1c17', '#0b5e40', '#138a5f', '#199e70', '#4cc196', '#8fdcbc', '#d3f3e5'],
-    age:      ['#1d1410', '#5c230b', '#8f3713', '#d95926', '#eb6834', '#f3a982', '#fbe0d2']
+    age:      ['#1d1410', '#5c230b', '#8f3713', '#d95926', '#eb6834', '#f3a982', '#fbe0d2'],
+    turb:     ['#1d1016', '#5a1f36', '#8f2f55', '#d55181', '#e87ba4', '#f2b3cb', '#fbe3ec']
   }
 };
 const hexRgb = hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)];
@@ -1211,7 +1317,7 @@ function readTheme() {
   theme = {
     panel: g('--panel'), bg: g('--bg'), ink: g('--ink'), ink2: g('--ink-2'), ink3: g('--ink-3'), accent: g('--accent'),
     steelA: g('--steel-a'), steelB: g('--steel-b'), steelEdge: g('--steel-edge'), gasket: g('--gasket'), gasketHi: g('--gasket-hi'),
-    hole: g('--hole'), handle: g('--handle'), trace: g('--trace'), line: g('--line'), rib: g('--rib'), ribHi: g('--rib-hi'),
+    hole: g('--hole'), handle: g('--handle'), trace: g('--trace'), line: g('--line'), rib: g('--rib'), ribHi: g('--rib-hi'), contact: g('--contact'),
     dataFont: g('--font-data') || 'monospace', displayFont: g('--font-display') || 'sans-serif',
     particleDark: isDark() ? 'rgba(6,12,18,0.7)' : 'rgba(12,28,42,0.62)'
   };
@@ -1223,7 +1329,7 @@ function readTheme() {
 /* ================= field → image ================= */
 const heat = document.createElement('canvas'); heat.width = NX; heat.height = NY;
 const hctx = heat.getContext('2d'); const img = hctx.createImageData(NX, NY);
-const disp = { vmax: 0.5, pmin: 0, pmax: 100, wmax: 50, umax: 3000, init: false };
+const disp = { vmax: 0.5, pmin: 0, pmax: 100, wmax: 50, umax: 3000, tmax: 0.3, init: false };
 
 function computeVel() {
   for (let n = 0; n < fluidList.length; n++) {
@@ -1264,6 +1370,7 @@ function colorize() {
     ease('pmin', lo, 0.04); ease('pmax', Math.max(hi, lo + 1e-3), 0.04);
   }
   if (mode === 'vort') ease('wmax', Math.max(percentile(c => Math.abs(vortF[c]), 0.95), 1), 0.04);
+  if (mode === 'turb' || first) ease('tmax', Math.max(percentile(c => turbI[c], 0.98) * 1.05, 0.02), 0.04);
 
   const tau = tauNominal(), data = img.data, L = LUTS[mode].lut;
   const pr = disp.pmax - disp.pmin || 1, Tin = state.params.Tin, Tc = state.params.Tc;
@@ -1276,6 +1383,7 @@ function colorize() {
     else if (mode === 'vort') t = 0.5 + vortF[c] / (2 * disp.wmax);
     else if (mode === 'temp') t = (T[c] - tlo) / tr;
     else if (mode === 'htc') t = Uloc[c] / disp.umax;
+    else if (mode === 'turb') t = turbI[c] / disp.tmax;
     else t = isFinite(tau) ? age[c] / (3 * tau) : 0;
     t = t < 0 ? 0 : t > 1 ? 1 : t; tCell[c] = t;
     const k = (t * 255) | 0, o = c * 4;
@@ -1649,7 +1757,7 @@ function probeAt(m) {
   const where = `x ${x.toFixed(0)} · y ${y.toFixed(0)} mm`;
   if (!fluid[c]) { probeEl.textContent = `${where} · sealed, outside the gasket`; return; }
   const zone = portIn[c] ? 'inlet port' : portOut[c] ? 'outlet port' : ZONE_NAME[zoneC[c]];
-  probeEl.textContent = `${where} · ${zone} · ${spd[c].toFixed(2)} m/s · ${fmtP(p[c] - outletPressure())} · ${T[c].toFixed(1)} °C${Uloc[c] ? ' · U ' + Uloc[c].toFixed(0) + ' W/m²K' : ''}`;
+  probeEl.textContent = `${where} · ${zone} · ${spd[c].toFixed(2)} m/s · ${fmtP(p[c] - outletPressure())} · ${T[c].toFixed(1)} °C${Uloc[c] ? ' · U ' + Uloc[c].toFixed(0) + ' W/m²K' : ''}${turbI[c] > 0.005 ? ' · turbulence ' + (100 * turbI[c]).toFixed(0) + '%' : ''}`;
 }
 function fmtP(pa) { return Math.abs(pa) >= 1000 ? `${(pa / 1000).toFixed(2)} kPa` : `${pa.toFixed(0)} Pa`; }
 
@@ -1723,7 +1831,7 @@ bindSeg('segHold', val => {
 $('rV').addEventListener('input', e => { state.params.vPort = +e.target.value; $('oV').textContent = `${state.params.vPort.toFixed(2)} m/s`; updateSources(); });
 $('rQ').addEventListener('input', e => { state.params.qLmin = +e.target.value; $('oQ').textContent = `${state.params.qLmin.toFixed(1)} L/min`; updateSources(); });
 $('rN').addEventListener('input', e => { state.params.nCh = +e.target.value; $('oN').textContent = e.target.value; updateSources(); });
-$('rGap').addEventListener('input', e => { state.params.gap = +e.target.value; $('oGap').textContent = `${state.params.gap.toFixed(1)} mm`; $('specGap').textContent = state.params.gap.toFixed(1); updateSources(); drawXsec(); });
+$('rGap').addEventListener('input', e => { state.params.gap = +e.target.value; $('oGap').textContent = `${state.params.gap.toFixed(1)} mm`; $('specGap').textContent = state.params.gap.toFixed(1); updateSources(); drawXsec(); buildPattern(); });
 $('rTin').addEventListener('input', e => { state.params.Tin = +e.target.value; $('oTin').textContent = `${e.target.value} °C`; $('specTin').textContent = e.target.value; updateSources(); updateLegend(true); });
 $('rTc').addEventListener('input', e => { state.params.Tc = +e.target.value; $('oTc').textContent = `${e.target.value} °C`; $('specTc').textContent = e.target.value; updateSources(); updateLegend(true); });
 $('nT').addEventListener('input', e => { const t = parseFloat(e.target.value); if (t >= 0.3 && t <= 1.2) { state.params.thick = t; $('specT').textContent = t.toFixed(2); drawXsec(); } });
@@ -1788,6 +1896,7 @@ function updateLegend(force) {
   }
   else if (mode === 'temp') { title = 'Water temperature'; unit = '°C'; const lo = Math.min(P.Tin, P.Tc), hi = Math.max(P.Tin, P.Tc); a = lo.toFixed(0); b = ((lo + hi) / 2).toFixed(1); c = hi.toFixed(0); }
   else if (mode === 'htc') { title = 'Overall heat transfer coefficient U'; unit = 'W/m²K'; a = '0'; b = (disp.umax / 2).toFixed(0); c = disp.umax.toFixed(0); }
+  else if (mode === 'turb') { title = 'Turbulence intensity u′/U (estimated)'; unit = '%'; a = '0'; b = (50 * disp.tmax).toFixed(0); c = (100 * disp.tmax).toFixed(0); }
   else if (mode === 'vort') { title = 'Swirl: blue clockwise, red anticlockwise'; unit = '1/s'; a = (-disp.wmax).toFixed(0); b = '0'; c = disp.wmax.toFixed(0); }
   else { title = 'Fluid age, in nominal residence times τ'; unit = isFinite(tau) ? `τ = ${tau.toFixed(2)} s` : 'τ'; a = '0'; b = '1.5τ'; c = '≥ 3τ'; }
   const key = [mode, title, a, b, c, unit, L.stops[0]].join('|');
@@ -1824,7 +1933,8 @@ const PROFILES = {
   temp:     { label: 'Temperature', unit: '°C', zero: false, get: c => T[c] },
   htc:      { label: 'Overall heat transfer coefficient U', unit: 'W/m²K', zero: true, get: c => Uloc[c] },
   age:      { label: 'Fluid age', unit: 's', zero: true, get: c => age[c] },
-  vort:     { label: 'Swirl (+ anticlockwise)', unit: '1/s', zero: true, get: c => vortAt(c) }
+  vort:     { label: 'Swirl (+ anticlockwise)', unit: '1/s', zero: true, get: c => vortAt(c) },
+  turb:     { label: 'Turbulence intensity (estimated)', unit: '%', zero: true, get: c => 100 * turbI[c] }
 };
 let profileKey = 'vdown';
 function sectionProfile(key) {
