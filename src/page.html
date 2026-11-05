@@ -425,12 +425,12 @@ figure { margin: 0; }
         <button type="button" data-v="speed" aria-pressed="true">Hold port speed</button>
         <button type="button" data-v="flow" aria-pressed="false">Hold flow rate</button>
       </div>
-      <label class="sl" for="rV" id="slV"><span>Port velocity</span><output id="oV">1.00 m/s</output>
-        <input type="range" id="rV" min="0.2" max="3" step="0.05" value="1"></label>
-      <label class="sl" for="rQ" id="slQ" hidden><span>Flow into this channel</span><output id="oQ">1.2 L/min</output>
-        <input type="range" id="rQ" min="0.2" max="20" step="0.1" value="1.2"></label>
-      <label class="sl" for="rN"><span>Channels fed by the port</span><output id="oN">50</output>
-        <input type="range" id="rN" min="4" max="150" step="1" value="50"></label>
+      <label class="sl" for="rV" id="slV"><span>Port velocity</span><output id="oV">2.10 m/s</output>
+        <input type="range" id="rV" min="0.2" max="3" step="0.05" value="2.1"></label>
+      <label class="sl" for="rQ" id="slQ" hidden><span>Flow into this channel</span><output id="oQ">6.1 L/min</output>
+        <input type="range" id="rQ" min="0.2" max="20" step="0.1" value="6.1"></label>
+      <label class="sl" for="rN"><span>Channels fed by the port</span><output id="oN">20</output>
+        <input type="range" id="rN" min="4" max="150" step="1" value="20"></label>
       <p class="hint">In a plate pack every second gap carries the hot water, and the port feeds all of those channels at once. This page simulates one of them, so it gets the port flow divided by this number.</p>
       <label class="sl" for="rGap"><span>Channel gap (pressing depth)</span><output id="oGap">2.0 mm</output>
         <input type="range" id="rGap" min="0.5" max="5" step="0.1" value="2"></label>
@@ -514,7 +514,7 @@ const PLATE_REGION = { x0: -26, y0: -10, w: 240, h: 474 };
 const state = {
   ports: {}, gasket: DEFAULT_GASKET.map(p => p.slice()), sectionY: 220,
   zones: { dist: true, chev: true, distLen: 128, phi: 60, show: true },
-  params: { vPort: 1.0, qLmin: 1.2, nCh: 50, hold: 'speed', gap: 2.0, thick: 0.5, Tin: 60, Tc: 15 },
+  params: { vPort: 2.1, qLmin: 6.1, nCh: 20, hold: 'speed', gap: 2.0, thick: 0.5, Tin: 60, Tc: 15 },
   view: { mode: 'speed', particles: true, streams: true, arrows: false },
   sel: 'in', editGasket: false, running: true, ref: null
 };
