@@ -283,7 +283,7 @@ figure { margin: 0; }
   <div class="spec" aria-label="Plate specification">
     <span>Plate <b>200 × 440</b> mm</span>
     <span>t = <b id="specT">0.50</b> mm</span>
-    <span>Gap <b id="specGap">3.0</b> mm</span>
+    <span>Gap <b id="specGap">2.0</b> mm</span>
     <span>Hot <b id="specTin">60</b> °C · Cold <b id="specTc">15</b> °C</span>
   </div>
 </header>
@@ -357,8 +357,8 @@ figure { margin: 0; }
       </div>
       <div class="presets" id="presets" role="group" aria-label="Port shape presets"></div>
       <div class="custom-note" id="customNote"></div>
-      <label class="sl" for="rSize"><span>Nominal diameter</span><output id="oSize">52 mm</output>
-        <input type="range" id="rSize" min="24" max="80" step="1" value="52"></label>
+      <label class="sl" for="rSize"><span>Nominal diameter</span><output id="oSize">35 mm</output>
+        <input type="range" id="rSize" min="20" max="80" step="1" value="35"></label>
       <label class="sl" for="rAspect"><span>Aspect (width : height)</span><output id="oAspect">1.00</output>
         <input type="range" id="rAspect" min="0.5" max="2" step="0.05" value="1"></label>
       <label class="sl" for="rRot"><span>Rotation</span><output id="oRot">0°</output>
@@ -399,14 +399,15 @@ figure { margin: 0; }
         <button type="button" data-v="speed" aria-pressed="true">Hold port speed</button>
         <button type="button" data-v="flow" aria-pressed="false">Hold flow rate</button>
       </div>
-      <label class="sl" for="rV" id="slV"><span>Port velocity</span><output id="oV">1.50 m/s</output>
-        <input type="range" id="rV" min="0.2" max="3" step="0.05" value="1.5"></label>
-      <label class="sl" for="rQ" id="slQ" hidden><span>Flow into this channel</span><output id="oQ">9.6 L/min</output>
-        <input type="range" id="rQ" min="1" max="40" step="0.5" value="9.5"></label>
-      <label class="sl" for="rN"><span>Channels fed by the port</span><output id="oN">20</output>
-        <input type="range" id="rN" min="4" max="60" step="1" value="20"></label>
-      <label class="sl" for="rGap"><span>Channel gap (pressing depth)</span><output id="oGap">3.0 mm</output>
-        <input type="range" id="rGap" min="0.5" max="5" step="0.1" value="3"></label>
+      <label class="sl" for="rV" id="slV"><span>Port velocity</span><output id="oV">1.00 m/s</output>
+        <input type="range" id="rV" min="0.2" max="3" step="0.05" value="1"></label>
+      <label class="sl" for="rQ" id="slQ" hidden><span>Flow into this channel</span><output id="oQ">1.2 L/min</output>
+        <input type="range" id="rQ" min="0.2" max="20" step="0.1" value="1.2"></label>
+      <label class="sl" for="rN"><span>Channels fed by the port</span><output id="oN">50</output>
+        <input type="range" id="rN" min="4" max="150" step="1" value="50"></label>
+      <p class="hint">In a plate pack every second gap carries the hot water, and the port feeds all of those channels at once. This page simulates one of them, so it gets the port flow divided by this number.</p>
+      <label class="sl" for="rGap"><span>Channel gap (pressing depth)</span><output id="oGap">2.0 mm</output>
+        <input type="range" id="rGap" min="0.5" max="5" step="0.1" value="2"></label>
       <label class="sl" for="rTin"><span>Hot water inlet</span><output id="oTin">60 °C</output>
         <input type="range" id="rTin" min="20" max="80" step="1" value="60"></label>
       <label class="sl" for="rTc"><span>Cold side</span><output id="oTc">15 °C</output>
@@ -477,8 +478,8 @@ const DEFAULT_GASKET = [
   [187, 396], [182, 414], [164, 419], [136, 416], [116, 400], [104, 370], [84, 344], [50, 324], [14, 310], [14, 220]
 ];
 const DEFAULT_PORTS = {
-  in:  { cx: 146, cy: 66,  size: 52, aspect: 1, rot: 0, preset: 'circle' },
-  out: { cx: 146, cy: 374, size: 52, aspect: 1, rot: 0, preset: 'circle' }
+  in:  { cx: 146, cy: 66,  size: 35, aspect: 1, rot: 0, preset: 'circle' },
+  out: { cx: 146, cy: 374, size: 35, aspect: 1, rot: 0, preset: 'circle' }
 };
 const PLATE_REGION = { x0: -26, y0: -10, w: 240, h: 474 };
 
@@ -486,7 +487,7 @@ const PLATE_REGION = { x0: -26, y0: -10, w: 240, h: 474 };
 const state = {
   ports: {}, gasket: DEFAULT_GASKET.map(p => p.slice()), sectionY: 220,
   zones: { dist: true, chev: true, distLen: 128, phi: 60, show: true },
-  params: { vPort: 1.5, qLmin: 9.5, nCh: 20, hold: 'speed', gap: 3.0, thick: 0.5, Tin: 60, Tc: 15 },
+  params: { vPort: 1.0, qLmin: 1.2, nCh: 50, hold: 'speed', gap: 2.0, thick: 0.5, Tin: 60, Tc: 15 },
   view: { mode: 'speed', particles: true, streams: true, arrows: false },
   sel: 'in', editGasket: false, running: true, ref: null
 };
@@ -959,7 +960,13 @@ function step(dt, iters) {
     v[iv] -= bV[iv] * g * (p[iv] - p[iv - NX]);
   }
 
-  // 4. scalars: fluid age and temperature (cooled through both walls)
+  transportScalars(dt);
+  simTime += dt;
+}
+
+// 4. scalars: fluid age and temperature (cooled through both walls)
+function transportScalars(dt) {
+  const P = state.params, inv = dt / DX, L = fluidList.length;
   const Tin = P.Tin, Tc = P.Tc;
   for (let n = 0; n < L; n++) {
     const c = fluidList[n], iu = cellIU[n], i = c % NX, j = (c / NX) | 0;
@@ -970,7 +977,6 @@ function step(dt, iters) {
     T1[c] = Tc + (sampleCell(T, xb, yb, T[c]) - Tc) * Math.exp(-lam[c] * dt);
   }
   let t = age; age = age1; age1 = t; t = T; T = T1; T1 = t;
-  simTime += dt;
 }
 
 /* ---------- local heat transfer coefficient ---------- */
@@ -1011,7 +1017,7 @@ function spawn(k, anywhere) {
 function resetParticles() { for (let k = 0; k < NPART; k++) spawn(k, true); }
 function tauNominal() { return G.Q > 0 ? (G.fluidArea * 1e-6 * state.params.gap / 1000) / G.Q : Infinity; }
 function moveParticles(dt) {
-  const inv = dt / DX, pOut = 1 - Math.exp(-Math.abs(G.Sout) * dt), maxLife = Math.min(14, 6 * tauNominal());
+  const inv = dt / DX, pOut = 1 - Math.exp(-Math.abs(G.Sout) * dt), maxLife = Math.min(60, 6 * tauNominal());
   const z = state.zones, ph = z.phi / DEG, sP = Math.sin(ph), cP = Math.cos(ph);
   // furrow flow dominates at low angles; at high angles the streams increasingly cross over the furrows
   const follow = clamp((85 - z.phi) / 40, 0.25, 1), lMix = (20 + 70 * cP * cP) / 1000;
@@ -1683,7 +1689,7 @@ $('chkPattern').addEventListener('change', e => { state.zones.show = e.target.ch
 
 bindSeg('segHold', val => {
   const P = state.params;
-  if (val === 'flow') { P.qLmin = Math.round(G.Q * 60000 * 2) / 2; $('rQ').value = P.qLmin; $('oQ').textContent = `${P.qLmin.toFixed(1)} L/min`; }
+  if (val === 'flow') { P.qLmin = clamp(Math.round(G.Q * 60000 * 10) / 10, 0.2, 20); $('rQ').value = P.qLmin; $('oQ').textContent = `${P.qLmin.toFixed(1)} L/min`; }
   else { P.vPort = clamp(Math.round(G.vPortEff * 20) / 20, 0.2, 3); $('rV').value = P.vPort; $('oV').textContent = `${P.vPort.toFixed(2)} m/s`; }
   P.hold = val; $('slV').hidden = val !== 'speed'; $('slQ').hidden = val !== 'flow'; updateSources();
 });
@@ -1905,9 +1911,16 @@ const plate = makeView('cvPlate', 'plateWrap', true);
 const detail = makeView('cvDetail', 'detailWrap', false);
 bindView(plate); bindView(detail);
 
-function advance(frameDt) {
-  let umax = 0.05;
+function maxSpeed() {
+  let umax = 0.02;
   for (let n = 0; n < fluidList.length; n += 3) { const c = fluidList[n]; if (spd[c] > umax) umax = spd[c]; }
+  return umax;
+}
+// simulated seconds per frame: 8 ms for fast flows, up to 40 ms when the flow is slow, so the fastest water moves
+// about two grid cells a frame and slow designs still settle within seconds
+const frameStep = () => clamp(2 * DX / maxSpeed(), 0.008, 0.04);
+function advance(frameDt) {
+  const umax = maxSpeed();
   const nsub = clamp(Math.ceil(frameDt * umax / (3.5 * DX)), 1, 6), dt = frameDt / nsub;
   for (let k = 0; k < nsub; k++) {
     const it = 32 + (extraIters > 0 ? (editingShape() ? 12 : 60) : 0); if (extraIters > 0) extraIters--;
@@ -1917,7 +1930,7 @@ function advance(frameDt) {
 }
 function frame() {
   if (geomDirty) { geomDirty = false; rebuildGeometry(); extraIters = Math.max(extraIters, 20); }
-  if (state.running) advance(0.008);
+  if (state.running) advance(frameStep());
   computeVel(); computeThermal(); colorize();
   const streamDue = G.streamsDirty ? (!editingShape() || frameNo - lastStreamFrame >= 10) : (state.running && frameNo % 20 === 0);
   if (streamDue) { computeStreams(); G.streamsDirty = false; lastStreamFrame = frameNo; }
@@ -1941,8 +1954,17 @@ function boot() {
   // warm-up so the first frame shows developed flow and temperatures
   computeVel(); computeThermal();
   step(0.004, 400);
-  for (let k = 0; k < 170; k++) { step(0.006, 36); if (k % 4 === 0) { computeVel(); computeThermal(); } }
-  for (let k = 0; k < 60; k++) moveParticles(0.008);
+  // run until the water has passed through the channel about twice, so temperatures have settled too
+  let tSim = 0;
+  for (let k = 0; k < 90; k++) {
+    const dt = clamp(2 * DX / maxSpeed(), 0.004, 0.05);
+    step(dt, 36); tSim += dt;
+    if (k % 3 === 0) { computeVel(); computeThermal(); }
+  }
+  // the flow has settled; carry temperature and age on alone (much cheaper) until about 2.5 channel volumes have passed
+  computeVel(); computeThermal();
+  for (let k = 0; k < 400 && tSim < 2.5 * tauNominal(); k++) { const dt = clamp(4 * DX / maxSpeed(), 0.004, 0.12); transportScalars(dt); tSim += dt; }
+  for (let k = 0; k < 60; k++) moveParticles(frameStep());
   syncPortUI(); syncPatternUI(); drawXsec();
   requestAnimationFrame(frame);
 }
