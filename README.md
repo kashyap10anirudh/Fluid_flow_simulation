@@ -32,7 +32,7 @@ GitHub Pages for a **private** repository needs a paid GitHub plan (Pro, Team or
 - **Readouts:**
   - Hydraulics: channel flow, pressure drop, Reynolds number, mean speed and low-flow area.
   - Heat transfer: outlet temperature, heat duty, mean U and effectiveness.
-  - A velocity profile across a movable section A–A, with a flow-uniformity index.
+  - A profile across a movable section A–A. Pick downward, sideways or overall speed, pressure, temperature, heat transfer coefficient, fluid age or swirl from the drop-down. A flow-uniformity index is always shown.
 - **Comparison:** pin a design as a reference and every readout and the A–A profile show the difference.
 
 ## Model
